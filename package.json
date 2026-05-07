@@ -1,0 +1,17 @@
+﻿{
+  "name": "skylog",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "build": "pnpm --parallel -r build",
+    "lint": "pnpm --parallel -r lint",
+    "type-check": "pnpm --parallel -r type-check",
+    "clean": "pnpm --parallel -r clean"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
