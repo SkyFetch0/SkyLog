@@ -1,37 +1,39 @@
-import Fastify from 'fastify'
-import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
-import cors from '@fastify/cors'
-import helmet from '@fastify/helmet'
-import sensible from '@fastify/sensible'
+import 'dotenv/config'
+import { buildServer } from './server.js'
+import { db } from './db/index.js'
+import { sandbox } from './sandbox.js'
+import { sql } from 'drizzle-orm'
 
-const server = Fastify({
-  logger: {
-    transport:
-      process.env.NODE_ENV === 'development'
-        ? { target: 'pino-pretty', options: { colorize: true } }
-        : undefined,
-  },
-}).withTypeProvider<TypeBoxTypeProvider>()
+async function main() {
+  // ── DB connectivity check ────────────────────────────────────────────────────
+  try {
+    await db.execute(sql`SELECT 1`)
+    console.log('[db] Connected to PostgreSQL')
+  } catch (err) {
+    console.error('[db] Failed to connect to PostgreSQL:', err)
+    process.exit(1)
+  }
 
-async function bootstrap() {
-  await server.register(helmet)
-  await server.register(cors, {
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
-  })
-  await server.register(sensible)
+  // ── Sandbox connectivity check ───────────────────────────────────────────────
+  try {
+    const ok = await sandbox.ping()
+    if (!ok) throw new Error('Sandbox ping returned false')
+    console.log('[sandbox] Docker sandbox is reachable')
+  } catch (err) {
+    console.warn('[sandbox] Sandbox not available — agent features will fail at runtime:', err)
+  }
 
-  server.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }))
+  // ── Start HTTP server ─────────────────────────────────────────────────────────
+  const server = await buildServer()
 
-  // TODO: register route plugins here
-  // await server.register(import('./routes/logs'), { prefix: '/api/logs' })
+  const port = Number(process.env.API_PORT ?? 4000)
+  const host = process.env.API_HOST ?? '0.0.0.0'
 
-  await server.listen({
-    port: Number(process.env.API_PORT ?? 3001),
-    host: process.env.API_HOST ?? '0.0.0.0',
-  })
+  await server.listen({ port, host })
+  console.log(`[api] Listening on http://${host}:${port}`)
 }
 
-bootstrap().catch((err) => {
-  server.log.error(err)
+main().catch((err) => {
+  console.error('Fatal error during startup:', err)
   process.exit(1)
 })
