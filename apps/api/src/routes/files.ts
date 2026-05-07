@@ -4,10 +4,14 @@ import { randomUUID } from 'crypto'
 import path from 'path'
 import { pipeline } from 'stream/promises'
 import fs from 'fs'
+import { exec } from 'child_process'
+import { promisify } from 'util'
 import { db } from '../db/index.js'
 import { files, sessions } from '../db/schema.js'
 import { sandbox } from '../sandbox.js'
 
+const execAsync = promisify(exec)
+const SANDBOX_CONTAINER = process.env.SANDBOX_CONTAINER ?? 'skylog-sandbox-1'
 const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500 MB
 
 export default async function fileRoutes(fastify: FastifyInstance) {
@@ -43,16 +47,20 @@ export default async function fileRoutes(fastify: FastifyInstance) {
     await pipeline(data.file, fs.createWriteStream(tmpPath))
     const stat = fs.statSync(tmpPath)
 
-    // Copy into sandbox container
-    const { exitCode, stderr } = await sandbox.exec(
-      `docker cp ${tmpPath} skylog-sandbox-1:${storagePath} 2>&1 || true`,
-    )
+    // docker cp must run on the HOST (API container), not inside the sandbox.
+    // sandbox.exec() wraps commands in `docker exec <sandbox>`, so calling
+    // `docker cp` through it would try to find Docker inside the sandbox, which fails.
+    let cpStderr = ''
+    try {
+      await execAsync(`docker cp ${JSON.stringify(tmpPath)} ${SANDBOX_CONTAINER}:${JSON.stringify(storagePath)}`)
+    } catch (err) {
+      cpStderr = err instanceof Error ? err.message : String(err)
+    } finally {
+      fs.unlink(tmpPath, () => {})
+    }
 
-    // Clean up temp file
-    fs.unlink(tmpPath, () => {})
-
-    if (exitCode !== 0 && stderr.includes('Error')) {
-      return reply.status(500).send({ error: 'Failed to copy file to sandbox', detail: stderr })
+    if (cpStderr) {
+      return reply.status(500).send({ error: 'Failed to copy file to sandbox', detail: cpStderr })
     }
 
     // Save to DB

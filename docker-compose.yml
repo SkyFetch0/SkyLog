@@ -39,10 +39,6 @@ services:
       - no-new-privileges:true
     volumes:
       - ./data/workspace:/workspace
-    networks:
-      - default
-    depends_on:
-      - redis
     healthcheck:
       test: ["CMD", "sh", "-c", "echo ok"]
       interval: 30s
@@ -55,11 +51,11 @@ services:
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     ports:
-      - "${API_PORT:-4000}:4000"
+      - "${API_PORT:-4001}:4000"
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-skylog}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-skylog}
+      REDIS_URL: redis://redis:6379
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       CUSTOM_API_BASE_URL: ${CUSTOM_API_BASE_URL:-}
       CUSTOM_API_KEY: ${CUSTOM_API_KEY:-}
@@ -71,11 +67,11 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,12 +84,14 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        # Browser hits the API via the HOST machine port, not internal Docker network
+        NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-4001}/api
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${WEB_PORT:-3000}:3000"
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:4000/api}
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: production
     depends_on:
       api:
         condition: service_healthy

@@ -1,15 +1,17 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  // Strict mode for catching potential issues early
   reactStrictMode: true,
+
+  // Required for Docker multi-stage standalone build
+  output: 'standalone',
 
   // Proxy /api requests to the Fastify backend during development
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/:path*`,
+        destination: `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4001'}/api/:path*`,
       },
     ]
   },

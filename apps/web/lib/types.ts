@@ -36,6 +36,7 @@ export interface Message {
   sessionId: string
   role: MessageRole
   content: string
+  thinkingContent?: string
   metadata?: Record<string, unknown> | null
   createdAt: string
 }
@@ -86,6 +87,7 @@ export interface ToolCall {
 
 export type SseEvent =
   | { type: 'thinking'; content: string }
+  | { type: 'text_delta'; content: string }
   | { type: 'tool_use'; tool: string; toolUseId: string; input: unknown }
   | { type: 'tool_result'; toolUseId: string; tool: string; success: boolean; output: string }
   | { type: 'sub_agent_spawned'; agentId: string; role: string; task: string }

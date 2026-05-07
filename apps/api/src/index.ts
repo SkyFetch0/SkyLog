@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { buildServer } from './server.js'
 import { db } from './db/index.js'
+import { runMigrations } from './db/migrate.js'
 import { sandbox } from './sandbox.js'
 import { sql } from 'drizzle-orm'
 
@@ -11,6 +12,15 @@ async function main() {
     console.log('[db] Connected to PostgreSQL')
   } catch (err) {
     console.error('[db] Failed to connect to PostgreSQL:', err)
+    process.exit(1)
+  }
+
+  // ── Auto-migrate on every startup ────────────────────────────────────────────
+  try {
+    await runMigrations()
+    console.log('[db] Migrations up to date')
+  } catch (err) {
+    console.error('[db] Migration failed:', err)
     process.exit(1)
   }
 

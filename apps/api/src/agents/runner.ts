@@ -12,7 +12,8 @@ import type { AgentContext, SandboxManager } from './types.js'
 // ── Event types emitted by the runner ─────────────────────────────────────────
 
 export type AgentEvent =
-  | { type: 'thinking'; delta: string }
+  | { type: 'thinking'; delta: string }      // Extended thinking block token
+  | { type: 'text_delta'; delta: string }    // Regular response text token (streamed)
   | { type: 'tool_use'; toolName: string; toolUseId: string; input: unknown }
   | { type: 'tool_result'; toolUseId: string; toolName: string; success: boolean; output: string }
   | { type: 'sub_agent_spawned'; agentId: string; role: string; task: string }
@@ -58,16 +59,22 @@ export interface SubAgentResult {
 
 export class AgentRunner {
   private readonly anthropic: Anthropic
-  private readonly model = 'claude-sonnet-4-5-20250929'
+  private readonly model: string
 
   constructor() {
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY environment variable is not set')
+    // Custom API takes precedence over Anthropic direct
+    const customBase = process.env.CUSTOM_API_BASE_URL
+    const customKey = process.env.CUSTOM_API_KEY
+    const customModel = process.env.CUSTOM_API_MODEL
+
+    const apiKey = customKey || process.env.ANTHROPIC_API_KEY
+    if (!apiKey) throw new Error('ANTHROPIC_API_KEY (or CUSTOM_API_KEY) environment variable is not set')
+
+    this.model = customModel || 'claude-sonnet-4-5-20250929'
+
     this.anthropic = new Anthropic({
       apiKey,
-      ...(process.env.CUSTOM_API_BASE_URL
-        ? { baseURL: process.env.CUSTOM_API_BASE_URL }
-        : {}),
+      ...(customBase ? { baseURL: customBase } : {}),
     })
   }
 
@@ -126,17 +133,26 @@ export class AgentRunner {
       for (let iteration = 0; iteration < maxIterations; iteration++) {
         if (signal?.aborted) break
 
-        const stream = this.anthropic.messages.stream({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const streamParams: any = {
           model: this.model,
-          max_tokens: 8192,
+          max_tokens: 16000,
           system: systemPrompt,
           tools: anthropicTools,
           messages,
-        })
+        }
+
+        // Extended thinking — supported by claude-sonnet-4-x and compatible APIs.
+        // If the API does not support it the stream will simply not emit
+        // thinking_delta events and we fall back to text-only streaming.
+        streamParams.thinking = { type: 'enabled', budget_tokens: 8000 }
+
+        const stream = this.anthropic.messages.stream(streamParams)
 
         let currentToolUseId = ''
         let currentToolName = ''
         let currentToolInputJson = ''
+        let currentBlockType: 'text' | 'thinking' | 'tool_use' | '' = ''
         const assistantContentBlocks: Anthropic.ContentBlock[] = []
 
         try {
@@ -146,9 +162,13 @@ export class AgentRunner {
             switch (event.type) {
               case 'content_block_start':
                 if (event.content_block.type === 'text') {
-                  // Omit `citations` — not part of the API request schema
+                  currentBlockType = 'text'
                   assistantContentBlocks.push({ type: 'text', text: '' } as Anthropic.TextBlock)
+                } else if (event.content_block.type === 'thinking') {
+                  currentBlockType = 'thinking'
+                  // thinking blocks are not stored in assistant content for API replay
                 } else if (event.content_block.type === 'tool_use') {
+                  currentBlockType = 'tool_use'
                   currentToolUseId = event.content_block.id
                   currentToolName = event.content_block.name
                   currentToolInputJson = ''
@@ -162,13 +182,19 @@ export class AgentRunner {
                 break
 
               case 'content_block_delta':
-                if (event.delta.type === 'text_delta') {
+                if (event.delta.type === 'thinking_delta') {
+                  // Extended thinking token
+                  yield { type: 'thinking', delta: event.delta.thinking }
+                } else if (event.delta.type === 'text_delta') {
                   const last = assistantContentBlocks[assistantContentBlocks.length - 1]
                   if (last?.type === 'text') {
                     (last as Anthropic.TextBlock).text += event.delta.text
                     finalText += event.delta.text
                   }
-                  yield { type: 'thinking', delta: event.delta.text }
+                  if (currentBlockType === 'text') {
+                    // Regular response text — stream to frontend in real-time
+                    yield { type: 'text_delta', delta: event.delta.text }
+                  }
                 } else if (event.delta.type === 'input_json_delta') {
                   currentToolInputJson += event.delta.partial_json
                 }

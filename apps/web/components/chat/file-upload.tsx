@@ -35,9 +35,7 @@ export function FileUpload({ sessionId, attachedFiles, onAttach, onDetach }: Pro
   }, [sessionId, onAttach])
 
   const onDrop = useCallback(
-    (accepted: File[]) => {
-      for (const f of accepted) uploadFile(f)
-    },
+    (accepted: File[]) => { for (const f of accepted) uploadFile(f) },
     [uploadFile],
   )
 
@@ -54,7 +52,7 @@ export function FileUpload({ sessionId, attachedFiles, onAttach, onDetach }: Pro
 
       {/* Drag overlay */}
       {isDragActive && (
-        <div className="absolute inset-0 z-10 rounded-xl bg-blue-500/10 border-2 border-dashed border-blue-500 flex items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 z-10 rounded-xl bg-blue-500/10 border-2 border-dashed border-blue-500/50 flex items-center justify-center pointer-events-none">
           <div className="flex items-center gap-2 text-blue-400 text-sm font-medium">
             <Upload className="h-4 w-4" />
             Drop log file here
@@ -62,65 +60,69 @@ export function FileUpload({ sessionId, attachedFiles, onAttach, onDetach }: Pro
         </div>
       )}
 
-      {/* Attached file chips */}
-      {(attachedFiles.length > 0 || uploading) && (
-        <div className="flex flex-wrap gap-1.5 mb-2 px-1">
-          {attachedFiles.map((f) => (
-            <FileChip
-              key={f.id}
-              name={f.originalName}
-              size={f.sizeBytes}
-              onRemove={() => onDetach(f.id)}
-            />
-          ))}
-          {uploading && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-xs text-zinc-400">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span>Uploading… {progress}%</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Upload trigger button */}
+      {/* Drop zone button */}
       <button
         type="button"
         onClick={open}
         disabled={uploading}
         className={cn(
-          'p-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors',
+          'w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed text-sm transition-all',
+          'border-white/[0.1] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.2] hover:bg-white/[0.02]',
           uploading && 'opacity-50 cursor-not-allowed',
         )}
-        title="Attach log file"
       >
-        <Upload className="h-4 w-4" />
+        {uploading ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin text-blue-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between mb-1">
+                <span className="text-xs text-zinc-400">Uploading…</span>
+                <span className="text-xs text-zinc-500">{progress}%</span>
+              </div>
+              <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <Upload className="h-4 w-4 shrink-0" />
+            <span>Upload log file</span>
+            <span className="ml-auto text-xs text-zinc-700">Apache · Nginx · MySQL · Syslog · JSON</span>
+          </>
+        )}
       </button>
+
+      {/* Attached file chips */}
+      {attachedFiles.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {attachedFiles.map((f) => (
+            <div
+              key={f.id}
+              className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 max-w-[200px]"
+            >
+              <FileText className="h-3 w-3 shrink-0" />
+              <span className="truncate">{f.originalName}</span>
+              <span className="text-blue-500/60 shrink-0">{formatSize(f.sizeBytes)}</span>
+              <button
+                type="button"
+                onClick={() => onDetach(f.id)}
+                className="shrink-0 text-blue-500/60 hover:text-blue-300 ml-0.5 p-0.5 rounded-md hover:bg-blue-500/10 transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-function FileChip({
-  name,
-  size,
-  onRemove,
-}: {
-  name: string
-  size: number
-  onRemove: () => void
-}) {
-  const kb = size < 1024 * 1024 ? `${(size / 1024).toFixed(0)}KB` : `${(size / 1024 / 1024).toFixed(1)}MB`
-  return (
-    <div className="flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 max-w-[180px]">
-      <FileText className="h-3 w-3 text-blue-400 shrink-0" />
-      <span className="truncate">{name}</span>
-      <span className="text-zinc-500 shrink-0">{kb}</span>
-      <button
-        type="button"
-        onClick={onRemove}
-        className="shrink-0 text-zinc-500 hover:text-zinc-200 ml-0.5"
-      >
-        <X className="h-3 w-3" />
-      </button>
-    </div>
-  )
+function formatSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }

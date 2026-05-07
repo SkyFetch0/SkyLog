@@ -1,7 +1,7 @@
 import { useAuthStore } from './auth'
 import type { SseEvent } from './types'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4001/api'
 
 export interface SseOptions {
   onEvent: (event: SseEvent) => void

@@ -55,7 +55,7 @@ export const logStatsTool: AgentTool<Input> = {
     ].join('\n')
 
     try {
-      const { stdout, exitCode } = await ctx.sandbox.exec(`bash -c ${JSON.stringify(script)}`)
+      const { stdout, exitCode } = await ctx.sandbox.exec(`/bin/bash -c ${JSON.stringify(script)}`)
 
       if (exitCode !== 0) {
         return { success: false, output: '', error: `Stats command failed (exit ${exitCode})` }

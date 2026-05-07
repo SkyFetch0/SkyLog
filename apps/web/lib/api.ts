@@ -10,7 +10,7 @@ import type {
 } from './types'
 
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api',
+  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4001/api',
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -53,7 +53,14 @@ export const sessionsApi = {
   create: (title?: string) =>
     apiClient.post<{ session: Session }>('/sessions', { title }).then((r) => r.data.session),
   get: (id: string) =>
-    apiClient.get<SessionDetail>(`/sessions/${id}`).then((r) => r.data),
+    apiClient
+      .get<{ session: Session; messages: SessionDetail['messages']; files: SessionDetail['files']; agentRuns: SessionDetail['agentRuns'] }>(`/sessions/${id}`)
+      .then((r) => ({
+        ...r.data.session,
+        messages: r.data.messages,
+        files: r.data.files,
+        agentRuns: r.data.agentRuns,
+      } as SessionDetail)),
   delete: (id: string) => apiClient.delete(`/sessions/${id}`),
 }
 
@@ -101,7 +108,7 @@ export function streamMessage(
   onEvent: (event: Record<string, unknown>) => void,
 ): () => void {
   const token = useAuthStore.getState().token
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api'
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4001/api'
 
   const ctrl = new AbortController()
 

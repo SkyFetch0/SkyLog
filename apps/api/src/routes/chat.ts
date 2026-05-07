@@ -81,11 +81,18 @@ export default async function chatRoutes(fastify: FastifyInstance) {
         : content
 
     // ── SSE response headers ─────────────────────────────────────────────────
+    // reply.raw.writeHead bypasses Fastify's onSend hooks (including @fastify/cors),
+    // so CORS headers must be added manually here for the browser to accept the stream.
+    const requestOrigin = request.headers.origin
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
+      ...(requestOrigin && {
+        'Access-Control-Allow-Origin': requestOrigin,
+        'Access-Control-Allow-Credentials': 'true',
+      }),
     })
 
     const sendEvent = (event: Record<string, unknown>) => {
@@ -182,6 +189,9 @@ function dispatchEvent(
   switch (event.type) {
     case 'thinking':
       send({ type: 'thinking', content: event.delta })
+      break
+    case 'text_delta':
+      send({ type: 'text_delta', content: event.delta })
       break
     case 'tool_use':
       send({ type: 'tool_use', tool: event.toolName, toolUseId: event.toolUseId, input: event.input })

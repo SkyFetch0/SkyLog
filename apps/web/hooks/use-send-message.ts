@@ -30,14 +30,15 @@ export function useSendMessage({ sessionId, onEvent, onDone }: UseSendMessageOpt
         { content, attachedFileIds },
         {
           onEvent: (event) => {
-            if (event.type === 'thinking') {
+            // Accumulate response text tokens in real-time
+            if (event.type === 'text_delta') {
               contentRef.current += event.content
             }
+            // completed.message is the authoritative final answer
             if (event.type === 'completed') {
               contentRef.current = event.message
             }
             if (event.type === 'sub_agent_spawned') {
-              // Trigger agent-runs refetch
               qc.invalidateQueries({ queryKey: ['agent-runs', sessionId] })
             }
             onEvent(event)
