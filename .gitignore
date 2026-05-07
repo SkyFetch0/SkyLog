@@ -2,10 +2,10 @@
 node_modules/
 .pnpm-store/
 
-# Environment
+# Environment — never commit secrets
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Build outputs
 dist/

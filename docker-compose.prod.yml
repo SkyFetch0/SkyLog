@@ -1,0 +1,102 @@
+# Production overrides — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# What this file adds over the base:
+#   - No host port exposure for postgres/redis (internal only)
+#   - Sandbox security hardening (read-only, no-new-privileges, tmpfs)
+#   - Resource limits for all services
+#   - Production restart policy
+#   - Log rotation
+
+services:
+  postgres:
+    ports: []   # Remove host port binding in production
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: '1.0'
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  redis:
+    ports: []   # Remove host port binding in production
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  sandbox:
+    # Security hardening
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /run:size=64m,mode=755
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_OVERRIDE    # Allow agent users to write to their own workdirs
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: '2.0'
+        reservations:
+          memory: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  api:
+    environment:
+      NODE_ENV: production
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: '1.0'
+        reservations:
+          memory: 256m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+  web:
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"

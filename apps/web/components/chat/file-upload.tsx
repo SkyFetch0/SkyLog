@@ -19,7 +19,7 @@ export function FileUpload({ sessionId, attachedFiles, onAttach, onDetach }: Pro
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
 
-  const uploadFile = async (file: File) => {
+  const uploadFile = useCallback(async (file: File) => {
     setUploading(true)
     setProgress(0)
     try {
@@ -32,13 +32,13 @@ export function FileUpload({ sessionId, attachedFiles, onAttach, onDetach }: Pro
       setUploading(false)
       setProgress(0)
     }
-  }
+  }, [sessionId, onAttach])
 
   const onDrop = useCallback(
     (accepted: File[]) => {
       for (const f of accepted) uploadFile(f)
     },
-    [sessionId],
+    [uploadFile],
   )
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({

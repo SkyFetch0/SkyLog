@@ -1,30 +1,8 @@
 import { z } from 'zod'
 import type { AgentTool, AgentContext, ToolResult } from '../types.js'
 
-// Semaphore to cap concurrent sub-agents
-class Semaphore {
-  private queue: Array<() => void> = []
-  private running = 0
-
-  constructor(private readonly limit: number) {}
-
-  async acquire(): Promise<void> {
-    if (this.running < this.limit) {
-      this.running++
-      return
-    }
-    await new Promise<void>((resolve) => this.queue.push(resolve))
-    this.running++
-  }
-
-  release(): void {
-    this.running--
-    const next = this.queue.shift()
-    if (next) next()
-  }
-}
-
-const subAgentSemaphore = new Semaphore(5)
+// Semaphore lives solely in concurrency.ts / runner.ts.
+// This tool no longer has its own semaphore to avoid double-throttle / deadlock.
 
 const inputSchema = z.object({
   role: z
@@ -55,7 +33,7 @@ export const spawnAgentTool: AgentTool<Input> = {
     'Spawn a specialized sub-agent to perform a focused analysis task. ' +
     'Only the orchestrator may call this. ' +
     'Maximum 5 sub-agents run concurrently (additional calls queue automatically). ' +
-    'Returns the sub-agent\'s structured result as JSON. ' +
+    "Returns the sub-agent's structured result as JSON. " +
     'Sub-agents cannot access the internet or spawn further agents.',
 
   inputSchema,
@@ -69,10 +47,9 @@ export const spawnAgentTool: AgentTool<Input> = {
       }
     }
 
-    await subAgentSemaphore.acquire()
-
     try {
-      // Dynamically import AgentRunner to avoid circular dependency at module load time
+      // Dynamic import to break circular dependency at module load time.
+      // Concurrency is controlled exclusively by globalSubAgentSemaphore inside runSubAgent().
       const { AgentRunner } = await import('../runner.js')
 
       const runner = new AgentRunner()
@@ -100,8 +77,6 @@ export const spawnAgentTool: AgentTool<Input> = {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       return { success: false, output: '', error: `Sub-agent failed: ${message}` }
-    } finally {
-      subAgentSemaphore.release()
     }
   },
 }

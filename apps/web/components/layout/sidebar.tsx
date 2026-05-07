@@ -132,7 +132,7 @@ export function Sidebar() {
                 active={pathname === `/chat/${session.id}`}
                 collapsed={collapsed}
                 onDelete={() => deleteMut.mutate(session.id)}
-                isDeleting={deleteMut.isPending}
+                isDeleting={deleteMut.isPending && deleteMut.variables === session.id}
               />
             ))
           )}
@@ -211,6 +211,7 @@ function SessionItem({
                   onDelete()
                 }}
                 disabled={isDeleting}
+                aria-label={`Delete session: ${session.title}`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

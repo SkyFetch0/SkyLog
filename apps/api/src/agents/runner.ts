@@ -30,6 +30,7 @@ export interface AgentRunOptions {
   parentRunId?: string
   maxIterations?: number
   sandbox: SandboxManager
+  signal?: AbortSignal
 }
 
 // ── Sub-agent invocation (called from spawn_agent tool) ───────────────────────
@@ -60,8 +61,10 @@ export class AgentRunner {
   private readonly model = 'claude-sonnet-4-5-20250929'
 
   constructor() {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) throw new Error('ANTHROPIC_API_KEY environment variable is not set')
     this.anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
+      apiKey,
       ...(process.env.CUSTOM_API_BASE_URL
         ? { baseURL: process.env.CUSTOM_API_BASE_URL }
         : {}),
@@ -80,6 +83,7 @@ export class AgentRunner {
       parentRunId,
       maxIterations = 25,
       sandbox,
+      signal,
     } = options
 
     const isOrchestrator = role === 'orchestrator'
@@ -91,7 +95,6 @@ export class AgentRunner {
     const agentTools = getToolsForAgent(toolRole)
     const anthropicTools = toAnthropicTools(agentTools)
 
-    // Build initial context message
     const fileContext =
       inputFiles.length > 0
         ? `\n\nFiles available for analysis:\n${inputFiles.map((f) => `- ${f}`).join('\n')}`
@@ -101,13 +104,11 @@ export class AgentRunner {
       { role: 'user', content: userMessage + fileContext },
     ]
 
-    // Persist run start
     await db
       .update(agentRuns)
       .set({ status: 'running', startedAt: new Date() })
       .where(eq(agentRuns.id, agentRunId))
 
-    // Build AgentContext for tool execution
     const ctx: AgentContext = {
       sessionId,
       agentId: agentRunId,
@@ -123,7 +124,8 @@ export class AgentRunner {
 
     try {
       for (let iteration = 0; iteration < maxIterations; iteration++) {
-        // ── Stream one Claude turn ───────────────────────────────────────────
+        if (signal?.aborted) break
+
         const stream = this.anthropic.messages.stream({
           model: this.model,
           max_tokens: 8192,
@@ -137,89 +139,91 @@ export class AgentRunner {
         let currentToolInputJson = ''
         const assistantContentBlocks: Anthropic.ContentBlock[] = []
 
-        // ── Process streaming events ─────────────────────────────────────────
-        for await (const event of stream) {
-          switch (event.type) {
-            case 'content_block_start':
-              if (event.content_block.type === 'text') {
-                assistantContentBlocks.push({ type: 'text', text: '', citations: [] } as Anthropic.ContentBlock)
-              } else if (event.content_block.type === 'tool_use') {
-                currentToolUseId = event.content_block.id
-                currentToolName = event.content_block.name
-                currentToolInputJson = ''
-                assistantContentBlocks.push({
-                  type: 'tool_use',
-                  id: currentToolUseId,
-                  name: currentToolName,
-                  input: {},
-                })
-              }
-              break
+        try {
+          for await (const event of stream) {
+            if (signal?.aborted) break
 
-            case 'content_block_delta':
-              if (event.delta.type === 'text_delta') {
+            switch (event.type) {
+              case 'content_block_start':
+                if (event.content_block.type === 'text') {
+                  // Omit `citations` — not part of the API request schema
+                  assistantContentBlocks.push({ type: 'text', text: '' } as Anthropic.TextBlock)
+                } else if (event.content_block.type === 'tool_use') {
+                  currentToolUseId = event.content_block.id
+                  currentToolName = event.content_block.name
+                  currentToolInputJson = ''
+                  assistantContentBlocks.push({
+                    type: 'tool_use',
+                    id: currentToolUseId,
+                    name: currentToolName,
+                    input: {},
+                  })
+                }
+                break
+
+              case 'content_block_delta':
+                if (event.delta.type === 'text_delta') {
+                  const last = assistantContentBlocks[assistantContentBlocks.length - 1]
+                  if (last?.type === 'text') {
+                    (last as Anthropic.TextBlock).text += event.delta.text
+                    finalText += event.delta.text
+                  }
+                  yield { type: 'thinking', delta: event.delta.text }
+                } else if (event.delta.type === 'input_json_delta') {
+                  currentToolInputJson += event.delta.partial_json
+                }
+                break
+
+              case 'content_block_stop': {
                 const last = assistantContentBlocks[assistantContentBlocks.length - 1]
-                if (last?.type === 'text') {
-                  last.text += event.delta.text
-                  finalText += event.delta.text
+                if (last?.type === 'tool_use' && currentToolInputJson) {
+                  try {
+                    (last as Anthropic.ToolUseBlock).input = JSON.parse(currentToolInputJson) as Record<string, unknown>
+                  } catch {
+                    (last as Anthropic.ToolUseBlock).input = {}
+                  }
                 }
-                yield { type: 'thinking', delta: event.delta.text }
-              } else if (event.delta.type === 'input_json_delta') {
-                currentToolInputJson += event.delta.partial_json
+                break
               }
-              break
 
-            case 'content_block_stop': {
-              // Finalize tool input JSON when block ends
-              const last = assistantContentBlocks[assistantContentBlocks.length - 1]
-              if (last?.type === 'tool_use' && currentToolInputJson) {
-                try {
-                  last.input = JSON.parse(currentToolInputJson) as Record<string, unknown>
-                } catch {
-                  last.input = {}
-                }
-              }
-              break
+              // message_delta carries output_tokens — do NOT add to totalInputTokens
+              // Token totals are taken from finalMessage() below.
             }
-
-            case 'message_delta':
-              totalInputTokens += event.usage?.output_tokens ?? 0
-              break
           }
+        } catch (streamErr) {
+          // Ensure Anthropic stream is cleaned up on error
+          stream.abort?.()
+          throw streamErr
         }
 
         const finalMessage = await stream.finalMessage()
         totalInputTokens += finalMessage.usage.input_tokens
         totalOutputTokens += finalMessage.usage.output_tokens
 
-        // Add assistant turn to history
         messages.push({ role: 'assistant', content: assistantContentBlocks })
 
-        // ── Check stop reason ────────────────────────────────────────────────
-        if (finalMessage.stop_reason === 'end_turn') {
-          break
-        }
-
-        if (finalMessage.stop_reason !== 'tool_use') {
-          break
-        }
+        if (finalMessage.stop_reason === 'end_turn') break
+        if (finalMessage.stop_reason !== 'tool_use') break
 
         // ── Execute tool calls ───────────────────────────────────────────────
         const toolResultContent: Anthropic.ToolResultBlockParam[] = []
+        const dbInserts: Promise<unknown>[] = []
 
         for (const block of assistantContentBlocks) {
           if (block.type !== 'tool_use') continue
+          if (signal?.aborted) break
 
-          const toolInput = block.input as Record<string, unknown>
-          yield { type: 'tool_use', toolName: block.name, toolUseId: block.id, input: toolInput }
+          const toolBlock = block as Anthropic.ToolUseBlock
+          const toolInput = toolBlock.input as Record<string, unknown>
+          yield { type: 'tool_use', toolName: toolBlock.name, toolUseId: toolBlock.id, input: toolInput }
 
-          const tool = getToolByName(block.name)
+          const tool = getToolByName(toolBlock.name)
           const startedAt = Date.now()
           let toolOutput: string
           let toolSuccess: boolean
 
           if (!tool) {
-            toolOutput = `Unknown tool: ${block.name}`
+            toolOutput = `Unknown tool: ${toolBlock.name}`
             toolSuccess = false
           } else {
             const parseResult = tool.inputSchema.safeParse(toolInput)
@@ -227,47 +231,55 @@ export class AgentRunner {
               toolOutput = `Invalid input: ${parseResult.error.message}`
               toolSuccess = false
             } else {
-              const result = await tool.execute(parseResult.data, ctx)
-              toolOutput = result.output || result.error || ''
-              toolSuccess = result.success
+              try {
+                const result = await tool.execute(parseResult.data, ctx)
+                toolOutput = result.output || result.error || ''
+                toolSuccess = result.success
+              } catch (execErr) {
+                toolOutput = execErr instanceof Error ? execErr.message : String(execErr)
+                toolSuccess = false
+              }
             }
           }
 
           const durationMs = Date.now() - startedAt
 
-          // Persist tool call to DB
-          await db.insert(toolCalls).values({
-            id: randomUUID(),
-            agentRunId,
-            toolName: block.name,
-            input: toolInput,
-            output: { success: toolSuccess, output: toolOutput },
-            durationMs,
-          })
+          // Buffer DB inserts — flush after loop to reduce round-trips
+          dbInserts.push(
+            db.insert(toolCalls).values({
+              id: randomUUID(),
+              agentRunId,
+              toolName: toolBlock.name,
+              input: toolInput,
+              output: { success: toolSuccess, output: toolOutput },
+              durationMs,
+            }),
+          )
 
           yield {
             type: 'tool_result',
-            toolUseId: block.id,
-            toolName: block.name,
+            toolUseId: toolBlock.id,
+            toolName: toolBlock.name,
             success: toolSuccess,
             output: toolOutput,
           }
 
           toolResultContent.push({
             type: 'tool_result',
-            tool_use_id: block.id,
+            tool_use_id: toolBlock.id,
             content: toolOutput,
             is_error: !toolSuccess,
           })
         }
 
-        // Add tool results as user turn
+        // Flush all tool-call DB inserts in parallel
+        await Promise.all(dbInserts)
+
         messages.push({ role: 'user', content: toolResultContent })
       }
 
       const tokensUsed = totalInputTokens + totalOutputTokens
 
-      // Persist completion
       await db
         .update(agentRuns)
         .set({
@@ -297,10 +309,10 @@ export class AgentRunner {
     const agentId = randomUUID()
     const { sessionId, parentRunId, role, task, inputFiles, sandbox } = options
 
+    // Single semaphore point: only globalSubAgentSemaphore, not spawn-agent's local one
     await globalSubAgentSemaphore.acquire()
 
     try {
-      // Insert DB record for sub-agent run
       await db.insert(agentRuns).values({
         id: agentId,
         sessionId,
@@ -335,12 +347,9 @@ export class AgentRunner {
         } else if (event.type === 'error') {
           success = false
           errorMsg = event.message
-        } else if (event.type === 'sub_agent_spawned') {
-          // Sub-agents cannot spawn further agents — guard is in spawn_agent tool
         }
       }
 
-      // Try to parse final result as JSON (specialist output schema)
       let parsedData: unknown = finalResult
       try {
         const jsonMatch = finalResult.match(/```json\s*([\s\S]*?)```/)

@@ -60,9 +60,15 @@ export function AgentPanel({ sessionId, hasActiveRun }: Props) {
   )
 }
 
+const MAX_AGENT_DEPTH = 10
+
 function AgentRunNode({ run, depth }: { run: AgentRun; depth: number }) {
   const [expanded, setExpanded] = useState(depth === 0)
   const hasChildren = (run.children?.length ?? 0) > 0
+
+  if (depth > MAX_AGENT_DEPTH) {
+    return <div className="ml-4 text-xs text-zinc-600 py-1 px-3">…max depth reached</div>
+  }
 
   const duration =
     run.startedAt && run.completedAt
@@ -76,6 +82,8 @@ function AgentRunNode({ run, depth }: { run: AgentRun; depth: number }) {
       <button
         className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-zinc-800/40 transition-colors"
         onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        aria-label={`${expanded ? 'Collapse' : 'Expand'} agent: ${run.role}`}
       >
         <StatusIcon status={run.status} />
         <div className="flex-1 min-w-0">

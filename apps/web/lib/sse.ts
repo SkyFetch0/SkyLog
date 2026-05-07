@@ -12,6 +12,10 @@ export interface SseOptions {
 /**
  * POST-based SSE client (fetch + ReadableStream).
  * Returns an abort function.
+ *
+ * Fixes:
+ * - onDone is called exactly once (not double-called via finally)
+ * - Reader is cancelled on abort / error
  */
 export function postSse(
   path: string,
@@ -37,17 +41,20 @@ export function postSse(
       if ((err as Error).name !== 'AbortError') {
         options.onError?.(String(err))
       }
+      options.onDone?.()
       return
     }
 
     if (!res.ok || !res.body) {
       options.onError?.(`HTTP ${res.status}`)
+      options.onDone?.()
       return
     }
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
+    let completed = false
 
     try {
       while (true) {
@@ -66,6 +73,7 @@ export function postSse(
               const parsed = JSON.parse(raw) as SseEvent
               options.onEvent(parsed)
               if (parsed.type === 'done') {
+                completed = true
                 options.onDone?.()
                 return
               }
@@ -80,7 +88,12 @@ export function postSse(
         options.onError?.(String(err))
       }
     } finally {
-      options.onDone?.()
+      // Cancel reader to release underlying resource
+      reader.cancel().catch(() => {})
+      // Only call onDone if not already called via 'done' event
+      if (!completed) {
+        options.onDone?.()
+      }
     }
   })()
 

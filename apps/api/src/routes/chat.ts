@@ -7,10 +7,11 @@ import { sessions, messages, files, agentRuns } from '../db/schema.js'
 import { sandbox } from '../sandbox.js'
 import { AgentRunner } from '../agents/runner.js'
 import type { AgentEvent } from '../agents/runner.js'
+import { AppError } from '../lib/errors.js'
 
 const sendMessageSchema = z.object({
   content: z.string().min(1).max(32_000),
-  attachedFileIds: z.array(z.string().uuid()).optional().default([]),
+  attachedFileIds: z.array(z.string().uuid()).max(20).optional().default([]),
 })
 
 export default async function chatRoutes(fastify: FastifyInstance) {
@@ -46,38 +47,38 @@ export default async function chatRoutes(fastify: FastifyInstance) {
         .where(and(eq(files.sessionId, sessionId), inArray(files.id, attachedFileIds)))
     }
 
-    // Persist user message
+    // Persist user message + agentRun + session.updatedAt in a single transaction
     const userMsgId = randomUUID()
-    await db.insert(messages).values({
-      id: userMsgId,
-      sessionId,
-      role: 'user',
-      content,
-      metadata: attachedFileIds.length > 0 ? { attachedFileIds } : null,
-    })
-
-    // Create orchestrator agent run record
     const agentRunId = randomUUID()
     const inputFiles = attachedFiles.map((f) => f.storagePath)
+
+    await db.transaction(async (tx) => {
+      await tx.insert(messages).values({
+        id: userMsgId,
+        sessionId,
+        role: 'user',
+        content,
+        metadata: attachedFileIds.length > 0 ? { attachedFileIds } : null,
+      })
+
+      await tx.insert(agentRuns).values({
+        id: agentRunId,
+        sessionId,
+        role: 'orchestrator',
+        status: 'pending',
+        task: content,
+        inputRefs: inputFiles,
+        workspacePath: sandbox.agentWorkdir(sessionId, agentRunId),
+        tokensUsed: 0,
+      })
+
+      await tx.update(sessions).set({ updatedAt: new Date() }).where(eq(sessions.id, sessionId))
+    })
 
     const userMessageForAgent =
       attachedFiles.length > 0
         ? `${content}\n\nAttached files:\n${attachedFiles.map((f) => `- ${f.originalName} → ${f.storagePath}`).join('\n')}`
         : content
-
-    await db.insert(agentRuns).values({
-      id: agentRunId,
-      sessionId,
-      role: 'orchestrator',
-      status: 'pending',
-      task: content,
-      inputRefs: inputFiles,
-      workspacePath: sandbox.agentWorkdir(sessionId, agentRunId),
-      tokensUsed: 0,
-    })
-
-    // Update session updatedAt
-    await db.update(sessions).set({ updatedAt: new Date() }).where(eq(sessions.id, sessionId))
 
     // ── SSE response headers ─────────────────────────────────────────────────
     reply.raw.writeHead(200, {
@@ -88,15 +89,32 @@ export default async function chatRoutes(fastify: FastifyInstance) {
     })
 
     const sendEvent = (event: Record<string, unknown>) => {
-      reply.raw.write(`data: ${JSON.stringify(event)}\n\n`)
+      try {
+        reply.raw.write(`data: ${JSON.stringify(event)}\n\n`)
+      } catch {
+        // Client already disconnected — ignore write error
+      }
     }
 
-    // Heartbeat to keep connection alive
+    // Abort controller tied to client disconnect
+    const abortCtrl = new AbortController()
+    request.raw.on('close', () => {
+      abortCtrl.abort()
+    })
+
+    // Heartbeat to keep connection alive — cleared on disconnect or completion
     const heartbeat = setInterval(() => {
-      reply.raw.write(': heartbeat\n\n')
+      if (abortCtrl.signal.aborted) {
+        clearInterval(heartbeat)
+        return
+      }
+      try {
+        reply.raw.write(': heartbeat\n\n')
+      } catch {
+        clearInterval(heartbeat)
+      }
     }, 15_000)
 
-    // Ensure agent user exists in sandbox
     try {
       await sandbox.ensureAgentUser(sessionId, agentRunId)
     } catch (err) {
@@ -114,8 +132,11 @@ export default async function chatRoutes(fastify: FastifyInstance) {
         userMessage: userMessageForAgent,
         inputFiles,
         sandbox,
+        signal: abortCtrl.signal,
       })) {
-        await dispatchEvent(event, sendEvent)
+        if (abortCtrl.signal.aborted) break
+
+        dispatchEvent(event, sendEvent)
 
         if (event.type === 'thinking') {
           assistantContent += event.delta
@@ -124,7 +145,6 @@ export default async function chatRoutes(fastify: FastifyInstance) {
         if (event.type === 'completed') {
           assistantContent = event.result
 
-          // Persist assistant message
           await db.insert(messages).values({
             id: randomUUID(),
             sessionId,
@@ -137,13 +157,17 @@ export default async function chatRoutes(fastify: FastifyInstance) {
         }
 
         if (event.type === 'error') {
-          sendEvent({ type: 'error', message: event.message })
+          // Only send a safe error message — never expose internal details
+          sendEvent({ type: 'error', message: 'Analysis failed. Please try again.' })
         }
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      fastify.log.error({ err }, 'AgentRunner error')
-      sendEvent({ type: 'error', message })
+      fastify.log.error({ err, sessionId, agentRunId }, 'AgentRunner error')
+      const isKnown = err instanceof AppError
+      sendEvent({
+        type: 'error',
+        message: isKnown ? (err as AppError).message : 'An unexpected error occurred.',
+      })
     } finally {
       clearInterval(heartbeat)
       reply.raw.end()
@@ -168,7 +192,7 @@ function dispatchEvent(
         toolUseId: event.toolUseId,
         tool: event.toolName,
         success: event.success,
-        output: event.output.slice(0, 2000), // truncate for SSE
+        output: event.output.slice(0, 2000),
       })
       break
     case 'sub_agent_spawned':
@@ -178,7 +202,7 @@ function dispatchEvent(
       send({ type: 'completed', message: event.result, tokensUsed: event.tokensUsed })
       break
     case 'error':
-      send({ type: 'error', message: event.message })
+      // Error payload already sent above — skip here to avoid double-send
       break
   }
 }

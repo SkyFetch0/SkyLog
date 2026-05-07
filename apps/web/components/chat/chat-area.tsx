@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowUp, StopCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -33,14 +33,14 @@ export function ChatArea({ session, onAgentActivity }: Props) {
     resetStreaming,
   } = useMessages(session.messages as MsgType[])
 
-  const handleEvent = (event: SseEvent) => {
+  const handleEvent = useCallback((event: SseEvent) => {
     applyEvent(event)
     if (event.type === 'sub_agent_spawned') onAgentActivity()
-  }
+  }, [applyEvent, onAgentActivity])
 
-  const handleDone = (finalContent: string) => {
+  const handleDone = useCallback((finalContent: string) => {
     finalizeStreaming(finalContent)
-  }
+  }, [finalizeStreaming])
 
   const { send, cancel, sending } = useSendMessage({
     sessionId: session.id,
@@ -67,6 +67,10 @@ export function ChatArea({ session, onAgentActivity }: Props) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit()
+    }
+    // ESC cancels active streaming (matches the UI hint shown to users)
+    if (e.key === 'Escape' && sending) {
+      cancel()
     }
   }
 
@@ -134,13 +138,16 @@ export function ChatArea({ session, onAgentActivity }: Props) {
             </div>
 
             {/* Textarea */}
+            <label htmlFor="chat-input" className="sr-only">Chat message</label>
             <textarea
+              id="chat-input"
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={sending}
               placeholder={sending ? 'Analyzing…' : 'Ask anything about the log…'}
+              aria-label="Chat message"
               rows={1}
               className={cn(
                 'w-full resize-none bg-transparent px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600',

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { useSession } from '@/hooks/use-session'
+import { useAgentRuns } from '@/hooks/use-agent-runs'
 import { ChatArea } from '@/components/chat/chat-area'
 import { AgentPanel } from '@/components/chat/agent-panel'
 
@@ -11,6 +12,17 @@ export default function SessionPage() {
   const { id } = useParams<{ id: string }>()
   const { data, isLoading, error } = useSession(id)
   const [hasActiveRun, setHasActiveRun] = useState(false)
+
+  const { data: runs } = useAgentRuns(id, hasActiveRun)
+
+  // Stop polling automatically when all runs reach a terminal state
+  useEffect(() => {
+    if (!runs?.length) return
+    const anyActive = runs.some(
+      (r) => r.status === 'running' || r.status === 'pending',
+    )
+    if (!anyActive) setHasActiveRun(false)
+  }, [runs])
 
   if (isLoading) {
     return (
@@ -31,6 +43,7 @@ export default function SessionPage() {
   return (
     <div className="flex h-full overflow-hidden">
       <ChatArea
+        key={data.id}
         session={data}
         onAgentActivity={() => setHasActiveRun(true)}
       />

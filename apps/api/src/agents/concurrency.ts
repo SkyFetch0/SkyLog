@@ -9,14 +9,18 @@ export class SubAgentSemaphore {
       this.running++
       return
     }
+    // Wait in queue — running is NOT incremented here; release() handles it.
     await new Promise<void>((resolve) => this.queue.push(resolve))
-    this.running++
   }
 
   release(): void {
-    this.running--
     const next = this.queue.shift()
-    if (next) next()
+    if (next) {
+      // Hand the slot directly to the next waiter; running count stays the same.
+      next()
+    } else {
+      this.running--
+    }
   }
 
   get activeCount(): number {

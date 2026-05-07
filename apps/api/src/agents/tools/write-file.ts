@@ -2,8 +2,10 @@ import { z } from 'zod'
 import path from 'path'
 import type { AgentTool, AgentContext, ToolResult } from '../types.js'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 const inputSchema = z.object({
-  path: z.string().min(1).describe('Absolute path to write (must be inside the agent\'s output/ directory)'),
+  path: z.string().min(1).describe("Absolute path to write (must be inside the agent's output/ directory)"),
   content: z.string().describe('File content to write'),
 })
 
@@ -14,13 +16,18 @@ export const writeFileTool: AgentTool<Input> = {
 
   description:
     'Write content to a file. ' +
-    'The file MUST be inside the agent\'s own output/ directory ' +
+    "The file MUST be inside the agent's own output/ directory " +
     '(/workspace/sessions/{sessionId}/agents/{agentId}/output/). ' +
     'Use this to persist analysis results, reports, or structured JSON output.',
 
   inputSchema,
 
   async execute(input: Input, ctx: AgentContext): Promise<ToolResult> {
+    // Validate IDs to prevent path traversal
+    if (!UUID_RE.test(ctx.sessionId) || !UUID_RE.test(ctx.agentId)) {
+      return { success: false, output: '', error: 'Invalid session/agent ID format.' }
+    }
+
     const resolved = path.resolve(input.path)
     const agentOutputDir = path.join(
       ctx.sandbox.agentWorkdir(ctx.sessionId, ctx.agentId),
@@ -40,10 +47,14 @@ export const writeFileTool: AgentTool<Input> = {
       }
     }
 
-    // Ensure output directory exists then write the file
     const dir = path.dirname(resolved)
     const mkdirScript = `mkdir -p ${JSON.stringify(dir)}`
-    const writeScript = `cat > ${JSON.stringify(resolved)} << 'SKYLOG_EOF'\n${input.content}\nSKYLOG_EOF`
+
+    // Use base64 encoding to avoid heredoc injection.
+    // If content contains SKYLOG_EOF the heredoc would close prematurely,
+    // allowing injected shell commands to run inside the sandbox.
+    const b64 = Buffer.from(input.content, 'utf8').toString('base64')
+    const writeScript = `echo ${JSON.stringify(b64)} | base64 -d > ${JSON.stringify(resolved)}`
 
     const user = ctx.sandbox.agentUser(ctx.agentId)
 

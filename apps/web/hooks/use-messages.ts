@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import React, { useState, useCallback } from 'react'
 import type { Message, SseEvent } from '@/lib/types'
 
 export interface LocalToolCall {
@@ -24,6 +24,18 @@ export interface StreamingMessage {
 export function useMessages(initialMessages: Message[]) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [streamingMsg, setStreamingMsg] = useState<StreamingMessage | null>(null)
+
+  // Sync state when initialMessages changes (e.g. navigating between sessions).
+  // The parent passes `key={session.id}` on ChatArea, but this guard ensures
+  // correctness even without remounting.
+  const prevInitialRef = React.useRef(initialMessages)
+  React.useEffect(() => {
+    if (prevInitialRef.current !== initialMessages) {
+      prevInitialRef.current = initialMessages
+      setMessages(initialMessages)
+      setStreamingMsg(null)
+    }
+  }, [initialMessages])
 
   const addUserMessage = useCallback((content: string): Message => {
     const msg: Message = {

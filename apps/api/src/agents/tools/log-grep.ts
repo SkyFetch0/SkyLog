@@ -2,6 +2,8 @@ import { z } from 'zod'
 import path from 'path'
 import type { AgentTool, AgentContext, ToolResult } from '../types.js'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 const inputSchema = z.object({
   path: z.string().min(1).describe('Absolute path to the log file'),
   pattern: z.string().min(1).describe('Regex pattern to search for (ripgrep syntax)'),
@@ -37,6 +39,11 @@ export const logGrepTool: AgentTool<Input> = {
   inputSchema,
 
   async execute(input: Input, ctx: AgentContext): Promise<ToolResult> {
+    // Validate IDs to prevent path traversal via sessionId/agentId
+    if (!UUID_RE.test(ctx.sessionId) || !UUID_RE.test(ctx.agentId)) {
+      return { success: false, output: '', error: 'Invalid session/agent ID format.' }
+    }
+
     const resolved = path.resolve(input.path)
 
     const uploadsDir = `/workspace/sessions/${ctx.sessionId}/uploads`
@@ -55,16 +62,20 @@ export const logGrepTool: AgentTool<Input> = {
     const contextLines = input.contextLines ?? 2
     const maxMatches = input.maxMatches ?? 100
 
-    const rgCmd = [
+    // Build rg command using individual JSON.stringify'd arguments joined with spaces.
+    // Each argument is shell-escaped independently to prevent pattern injection.
+    const rgArgs = [
       'rg',
       '--no-heading',
       '--line-number',
       '--color=never',
-      `-C ${contextLines}`,
-      `-m ${maxMatches}`,
-      `-e ${JSON.stringify(input.pattern)}`,
-      JSON.stringify(resolved),
-    ].join(' ')
+      '-C', String(contextLines),
+      '-m', String(maxMatches),
+      '-e', input.pattern,   // rg handles -e argument; no shell expansion inside rg
+      resolved,
+    ]
+    // Compose as a sh -c call with each argument JSON-stringified
+    const rgCmd = rgArgs.map((a) => JSON.stringify(a)).join(' ')
 
     try {
       const { stdout, stderr, exitCode } = await ctx.sandbox.exec(rgCmd)
