@@ -124,8 +124,12 @@ export default async function chatRoutes(fastify: FastifyInstance) {
 
     try {
       await sandbox.ensureAgentUser(sessionId, agentRunId)
+      // Pre-create the output directory so bash_execute / write_file
+      // can use the workdir without a "no such directory" error.
+      const workdir = sandbox.agentWorkdir(sessionId, agentRunId)
+      await sandbox.exec(`mkdir -p ${JSON.stringify(workdir + '/output')}`)
     } catch (err) {
-      fastify.log.warn({ err }, 'ensureAgentUser failed — continuing anyway')
+      fastify.log.warn({ err }, 'ensureAgentUser / workdir init failed — continuing anyway')
     }
 
     try {
@@ -152,14 +156,19 @@ export default async function chatRoutes(fastify: FastifyInstance) {
         if (event.type === 'completed') {
           assistantContent = event.result
 
+          const assistantMsgId = randomUUID()
           await db.insert(messages).values({
-            id: randomUUID(),
+            id: assistantMsgId,
             sessionId,
             role: 'assistant',
             content: assistantContent,
             metadata: { agentRunId },
           })
 
+          // Send the server-assigned message ID so the client can use the same
+          // UUID — this allows the merge logic to match local enrichment
+          // (thinkingContent, toolCalls, subAgents) with the server record.
+          sendEvent({ type: 'completed', message: event.result, tokensUsed: event.tokensUsed, messageId: assistantMsgId })
           sendEvent({ type: 'done' })
         }
 

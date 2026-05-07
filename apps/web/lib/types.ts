@@ -37,6 +37,8 @@ export interface Message {
   role: MessageRole
   content: string
   thinkingContent?: string
+  toolCalls?: import('@/hooks/use-messages').LocalToolCall[]
+  subAgents?: import('@/hooks/use-messages').LocalSubAgent[]
   metadata?: Record<string, unknown> | null
   createdAt: string
 }
@@ -91,6 +93,6 @@ export type SseEvent =
   | { type: 'tool_use'; tool: string; toolUseId: string; input: unknown }
   | { type: 'tool_result'; toolUseId: string; tool: string; success: boolean; output: string }
   | { type: 'sub_agent_spawned'; agentId: string; role: string; task: string }
-  | { type: 'completed'; message: string; tokensUsed: number }
+  | { type: 'completed'; message: string; tokensUsed: number; messageId?: string }
   | { type: 'error'; message: string }
   | { type: 'done' }

@@ -15,17 +15,24 @@ export interface LocalToolCall {
   durationMs?: number
 }
 
+export interface LocalSubAgent {
+  id: string
+  agentId: string
+  role: string
+  task: string
+  spawnedAt: number
+}
+
 export interface StreamingMessage {
   id: string
   role: 'assistant'
-  // Reasoning / thinking text streamed before the final answer
   thinkingContent: string
-  // Final answer text
   content: string
   toolCalls: LocalToolCall[]
+  subAgents: LocalSubAgent[]
   streaming: boolean
-  // Phase tracking for better UX
   phase: 'thinking' | 'tool' | 'responding' | 'done'
+  serverMessageId?: string
 }
 
 export function useMessages(initialMessages: Message[]) {
@@ -36,10 +43,24 @@ export function useMessages(initialMessages: Message[]) {
   React.useEffect(() => {
     if (prevInitialRef.current !== initialMessages) {
       prevInitialRef.current = initialMessages
-      setMessages(initialMessages)
-      // Only clear streaming message when NOT actively streaming.
-      // During an SSE stream the session query is invalidated and
-      // initialMessages changes — we must not wipe the in-progress state.
+      // Merge server messages with locally-enriched state.
+      // The server returns plain Message objects without thinkingContent /
+      // toolCalls / subAgents — those fields only exist in client memory.
+      // We preserve them when the server refreshes the message list so that
+      // tool call / thinking panels don't disappear after invalidateQueries.
+      setMessages((prev) => {
+        const localById = new Map(prev.map((m) => [m.id, m]))
+        return initialMessages.map((serverMsg) => {
+          const local = localById.get(serverMsg.id)
+          if (!local) return serverMsg
+          return {
+            ...serverMsg,
+            thinkingContent: local.thinkingContent ?? serverMsg.thinkingContent,
+            toolCalls: local.toolCalls ?? serverMsg.toolCalls,
+            subAgents: local.subAgents ?? serverMsg.subAgents,
+          }
+        })
+      })
       setStreamingMsg((current) => (current?.streaming ? current : null))
     }
   }, [initialMessages])
@@ -63,6 +84,7 @@ export function useMessages(initialMessages: Message[]) {
       thinkingContent: '',
       content: '',
       toolCalls: [],
+      subAgents: [],
       streaming: true,
       phase: 'thinking',
     })
@@ -120,12 +142,28 @@ export function useMessages(initialMessages: Message[]) {
           return { ...prev, toolCalls: updated }
         }
 
+        case 'sub_agent_spawned':
+          return {
+            ...prev,
+            subAgents: [
+              ...prev.subAgents,
+              {
+                id: crypto.randomUUID(),
+                agentId: event.agentId,
+                role: event.role,
+                task: event.task,
+                spawnedAt: Date.now(),
+              },
+            ],
+          }
+
         case 'completed':
           return {
             ...prev,
             content: event.message,
             streaming: false,
             phase: 'done',
+            serverMessageId: event.messageId,
           }
 
         default:
@@ -136,12 +174,17 @@ export function useMessages(initialMessages: Message[]) {
 
   const finalizeStreaming = useCallback((content: string) => {
     setStreamingMsg((current) => {
+      // Use the server-assigned ID when available so the merge logic in the
+      // useEffect below can match this local message to the refetched server
+      // message and preserve thinkingContent / toolCalls / subAgents.
       const final: Message = {
-        id: crypto.randomUUID(),
+        id: current?.serverMessageId ?? crypto.randomUUID(),
         sessionId: '',
         role: 'assistant',
         content,
         thinkingContent: current?.thinkingContent ?? '',
+        toolCalls: current?.toolCalls ?? [],
+        subAgents: current?.subAgents ?? [],
         createdAt: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, final])
