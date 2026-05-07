@@ -36,8 +36,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./data/workspace:/workspace
-    environment:
-      - NODE_ENV=production
+    networks:
+      - default
     depends_on:
       - redis
 
