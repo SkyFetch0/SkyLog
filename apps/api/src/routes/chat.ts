@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, asc, ne } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { db } from '../db/index.js'
@@ -80,6 +80,18 @@ export default async function chatRoutes(fastify: FastifyInstance) {
         ? `${content}\n\nAttached files:\n${attachedFiles.map((f) => `- ${f.originalName} → ${f.storagePath}`).join('\n')}`
         : content
 
+    // Fetch prior messages in this session (excluding the message we just inserted)
+    // to build the conversation history for the agent.
+    const priorMessages = await db
+      .select({ id: messages.id, role: messages.role, content: messages.content })
+      .from(messages)
+      .where(and(eq(messages.sessionId, sessionId), ne(messages.id, userMsgId)))
+      .orderBy(asc(messages.createdAt))
+
+    const conversationHistory = priorMessages
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+
     // ── SSE response headers ─────────────────────────────────────────────────
     // reply.raw.writeHead bypasses Fastify's onSend hooks (including @fastify/cors),
     // so CORS headers must be added manually here for the browser to accept the stream.
@@ -144,6 +156,7 @@ export default async function chatRoutes(fastify: FastifyInstance) {
         inputFiles,
         sandbox,
         signal: abortCtrl.signal,
+        conversationHistory,
       })) {
         if (abortCtrl.signal.aborted) break
 

@@ -32,6 +32,8 @@ export interface AgentRunOptions {
   maxIterations?: number
   sandbox: SandboxManager
   signal?: AbortSignal
+  // Previous turns in the session, oldest-first (user/assistant alternating)
+  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
 }
 
 // ── Sub-agent invocation (called from spawn_agent tool) ───────────────────────
@@ -107,7 +109,14 @@ export class AgentRunner {
         ? `\n\nFiles available for analysis:\n${inputFiles.map((f) => `- ${f}`).join('\n')}`
         : ''
 
+    // Build message list: inject conversation history before the current turn.
+    // The Anthropic API requires messages to alternate user/assistant strictly.
+    // We cap history at the last 20 turns (10 exchanges) to stay within context.
+    const history = options.conversationHistory ?? []
+    const cappedHistory = history.slice(-20)
+
     const messages: Anthropic.MessageParam[] = [
+      ...cappedHistory.map((m) => ({ role: m.role, content: m.content })),
       { role: 'user', content: userMessage + fileContext },
     ]
 
