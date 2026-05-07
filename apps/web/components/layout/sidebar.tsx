@@ -4,7 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Zap, Plus, MessageSquare, Trash2, LogOut, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import Image from 'next/image'
+import { Plus, MessageSquare, Trash2, LogOut, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { sessionsApi } from '@/lib/api'
@@ -65,15 +66,20 @@ export function Sidebar() {
         </button>
 
         {/* Logo */}
-        <div className={cn('flex items-center h-14 px-3 border-b border-white/[0.06]', collapsed ? 'justify-center' : 'gap-2.5 px-4')}>
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
-            <Zap className="w-3.5 h-3.5 text-white" />
-          </div>
-          {!collapsed && (
-            <Link href="/chat" className="font-bold text-sm text-white tracking-tight truncate">
-              SkyLog
-            </Link>
-          )}
+        <div className={cn('flex items-center h-14 border-b border-white/[0.06]', collapsed ? 'justify-center px-3' : 'px-4')}>
+          <Link href="/chat" className="flex items-center gap-2.5 shrink-0">
+            <Image
+              src="/images/SkyLogo.png"
+              alt="SkyLog"
+              width={collapsed ? 28 : 28}
+              height={collapsed ? 28 : 28}
+              className="rounded-lg object-contain shrink-0"
+              priority
+            />
+            {!collapsed && (
+              <span className="font-bold text-sm text-white tracking-tight truncate">SkyLog</span>
+            )}
+          </Link>
         </div>
 
         {/* New Analysis Button */}
