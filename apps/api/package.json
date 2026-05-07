@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@skylog/api",
   "version": "0.1.0",
   "private": true,
@@ -8,23 +8,30 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",
     "@fastify/helmet": "^13.0.1",
+    "@fastify/jwt": "^9.0.1",
+    "@fastify/multipart": "^9.0.3",
     "@fastify/sensible": "^6.0.3",
     "@fastify/type-provider-typebox": "^5.1.0",
     "@sinclair/typebox": "^0.34.15",
     "@skylog/shared": "workspace:*",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.41.0",
     "fastify": "^5.3.2",
-    "pg": "^8.13.3",
     "ioredis": "^5.4.2",
-    "pino": "^9.6.0"
+    "postgres": "^3.4.5",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^22.13.9",
-    "@types/pg": "^8.11.11",
+    "drizzle-kit": "^0.30.4",
     "tsx": "^4.19.3",
     "typescript": "^5.7.2"
   }
