@@ -258,7 +258,13 @@ export class AgentRunner {
           let toolSuccess: boolean
 
           if (!tool) {
-            toolOutput = `Unknown tool: ${toolBlock.name}`
+            // Help the model self-correct: list available tools so it picks
+            // a valid one on the next turn. Some models occasionally emit
+            // synthetic names like `function_calls` due to XML wrapper
+            // artifacts in their pretraining — a clear list nudges them
+            // back on track.
+            const available = getToolsForAgent(toolRole).map((t) => t.name).join(', ')
+            toolOutput = `Unknown tool: "${toolBlock.name}". Available tools: ${available}.`
             toolSuccess = false
           } else {
             const parseResult = tool.inputSchema.safeParse(toolInput)

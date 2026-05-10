@@ -25,16 +25,16 @@ export default function SessionPage() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#070b14]">
-        <Loader2 className="h-5 w-5 animate-spin text-zinc-700" />
+      <div className="flex-1 flex items-center justify-center bg-background">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
       </div>
     )
   }
 
   if (error || !data) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#070b14]">
-        <p className="text-sm text-red-400">Failed to load session.</p>
+      <div className="flex-1 flex items-center justify-center bg-background">
+        <p className="text-sm text-destructive">Failed to load session.</p>
       </div>
     )
   }

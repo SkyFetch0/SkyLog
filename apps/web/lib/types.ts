@@ -1,8 +1,11 @@
 // ── Auth ────────────────────────────────────────────────────────────────────────
 
+export type UserRole = 'user' | 'admin'
+
 export interface User {
   id: string
   email: string
+  role?: UserRole         // Eski tokenlar için optional — /auth/me'den gelir
   createdAt: string
 }
 

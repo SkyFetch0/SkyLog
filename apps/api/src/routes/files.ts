@@ -63,20 +63,31 @@ export default async function fileRoutes(fastify: FastifyInstance) {
       return reply.status(500).send({ error: 'Failed to copy file to sandbox', detail: cpStderr })
     }
 
-    // Save to DB
-    const [file] = await db
-      .insert(files)
-      .values({
-        id: fileId,
-        sessionId,
-        originalName: data.filename,
-        storagePath,
-        sizeBytes: stat.size,
-        mimeType: data.mimetype,
-      })
-      .returning()
+    // Save to DB. If insert fails (e.g. Postgres connection drop), we must
+    // remove the orphan file from sandbox to keep filesystem and DB in sync.
+    try {
+      const [file] = await db
+        .insert(files)
+        .values({
+          id: fileId,
+          sessionId,
+          originalName: data.filename,
+          storagePath,
+          sizeBytes: stat.size,
+          mimeType: data.mimetype,
+        })
+        .returning()
 
-    return reply.status(201).send({ file })
+      return reply.status(201).send({ file })
+    } catch (err) {
+      // Rollback: silently remove the orphan from sandbox
+      sandbox
+        .exec(`rm -f ${JSON.stringify(storagePath)}`)
+        .catch((e) => fastify.log.warn({ err: e, storagePath }, 'Orphan cleanup failed'))
+
+      fastify.log.error({ err, sessionId }, 'Failed to persist file metadata after sandbox copy')
+      return reply.status(500).send({ error: 'Failed to save file metadata' })
+    }
   })
 
   // ── GET /sessions/:id/files ───────────────────────────────────────────────────

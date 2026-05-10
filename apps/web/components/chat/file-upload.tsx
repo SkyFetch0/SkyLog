@@ -67,7 +67,7 @@ export function FileUpload({ sessionId, attachedFiles, onAttach, onDetach }: Pro
         disabled={uploading}
         className={cn(
           'w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed text-sm transition-all',
-          'border-white/[0.1] text-zinc-500 hover:text-zinc-300 hover:border-white/[0.2] hover:bg-white/[0.02]',
+          'border-[hsl(var(--glass-border))] text-muted-foreground hover:text-foreground hover:border-[hsl(0_0%_100%/0.2)] hover:bg-[hsl(0_0%_100%/0.02)]',
           uploading && 'opacity-50 cursor-not-allowed',
         )}
       >
@@ -76,12 +76,12 @@ export function FileUpload({ sessionId, attachedFiles, onAttach, onDetach }: Pro
             <Loader2 className="h-4 w-4 animate-spin text-blue-400 shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="flex justify-between mb-1">
-                <span className="text-xs text-zinc-400">Uploading…</span>
-                <span className="text-xs text-zinc-500">{progress}%</span>
+                <span className="text-xs text-muted-foreground">Uploading…</span>
+                <span className="text-xs text-muted-foreground/70">{progress}%</span>
               </div>
-              <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+              <div className="h-1 rounded-full bg-[hsl(0_0%_100%/0.06)] overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all duration-300"
+                  className="h-full rounded-full bg-gradient-to-r from-primary to-[hsl(199_89%_55%)] transition-all duration-300"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -91,7 +91,7 @@ export function FileUpload({ sessionId, attachedFiles, onAttach, onDetach }: Pro
           <>
             <Upload className="h-4 w-4 shrink-0" />
             <span>Upload log file</span>
-            <span className="ml-auto text-xs text-zinc-700">Apache · Nginx · MySQL · Syslog · JSON</span>
+            <span className="ml-auto text-xs text-muted-foreground/60">Apache · Nginx · MySQL · Syslog · JSON</span>
           </>
         )}
       </button>

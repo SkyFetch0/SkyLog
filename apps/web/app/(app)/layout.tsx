@@ -4,11 +4,15 @@ import { useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/auth'
 import { Sidebar } from '@/components/layout/sidebar'
+import { useCurrentUser } from '@/hooks/use-current-user'
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const router = useRouter()
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const hasHydrated = useAuthStore((s) => s._hasHydrated)
+
+  // Sayfa yüklendiğinde /auth/me ile role bilgisini taze tut (admin guard için).
+  useCurrentUser()
 
   useEffect(() => {
     // Wait for Zustand to rehydrate from localStorage before redirecting.

@@ -22,12 +22,15 @@ export const agentStatusEnum = pgEnum('agent_status', [
   'failed',
 ])
 
+export const userRoleEnum = pgEnum('user_role', ['user', 'admin'])
+
 // ── Tables ───────────────────────────────────────────────────────────────────
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull(),
   passwordHash: text('password_hash').notNull(),
+  role: userRoleEnum('role').notNull().default('user'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique().on(t.email)])
 

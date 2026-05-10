@@ -17,14 +17,37 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      {/*
+       * Theme system is data-theme based (CSS selector [data-theme="dark"]).
+       * `themes` lists all valid palettes — adding a new palette is:
+       *   1. Add `[data-theme="purple"] { ... }` block to globals.css
+       *   2. Add 'purple' to this array
+       *   3. Add a chip in the Settings page selector
+       *
+       * `defaultTheme="dark"` ensures fresh visitors get the dark palette.
+       * `enableSystem={false}` disables auto OS-theme detection — we want
+       *  explicit user choice; uncomment to re-enable.
+       */}
       <ThemeProvider
-        attribute="class"
+        attribute="data-theme"
         defaultTheme="dark"
         enableSystem={false}
+        themes={['dark', 'light', 'purple', 'ocean']}
+        storageKey="skylog-theme"
         disableTransitionOnChange
       >
         {children}
-        <Toaster richColors position="bottom-right" />
+        <Toaster
+          richColors
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: 'hsl(var(--surface-2))',
+              border: '1px solid hsl(var(--border-strong))',
+              color: 'hsl(var(--foreground))',
+            },
+          }}
+        />
       </ThemeProvider>
     </QueryClientProvider>
   )

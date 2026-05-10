@@ -7,6 +7,7 @@ import type {
   FileRecord,
   AgentRun,
   ToolCall,
+  UserRole,
 } from './types'
 
 export const apiClient = axios.create({
@@ -43,6 +44,12 @@ export const authApi = {
   login: (email: string, password: string) =>
     apiClient.post<AuthResponse>('/auth/login', { email, password }).then((r) => r.data),
   me: () => apiClient.get<{ user: AuthResponse['user'] }>('/auth/me').then((r) => r.data),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    apiClient
+      .patch<{ ok: true }>('/auth/password', { currentPassword, newPassword })
+      .then((r) => r.data),
+  deleteAccount: (password: string) =>
+    apiClient.delete<void>('/auth/me', { data: { password } }).then((r) => r.data),
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
@@ -84,6 +91,80 @@ export const filesApi = {
       .then((r) => r.data.file)
   },
   delete: (fileId: string) => apiClient.delete(`/files/${fileId}`),
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+export interface AdminStats {
+  users: number
+  sessions: number
+  messages: number
+  files: number
+  tokensTotal: number
+  tokens24h: number
+  activeUsers7d: number
+  activeRuns: number
+  failedRuns24h: number
+}
+
+export interface AdminUser {
+  id: string
+  email: string
+  role: UserRole
+  createdAt: string
+  sessionCount: number
+}
+
+export interface AdminSession {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  userId: string
+  userEmail: string
+  messageCount: number
+}
+
+export interface AdminAgentRun {
+  id: string
+  sessionId: string
+  role: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  task: string
+  tokensUsed: number
+  startedAt: string | null
+  completedAt: string | null
+  userEmail: string
+}
+
+export interface AdminHealth {
+  sandbox: 'ok' | 'error'
+  database: 'ok' | 'error'
+  toolCalls: number
+  avgToolDurationMs: number
+  timestamp: string
+}
+
+export const adminApi = {
+  stats: () => apiClient.get<AdminStats>('/admin/stats').then((r) => r.data),
+  users: (params?: { search?: string; limit?: number; offset?: number }) =>
+    apiClient
+      .get<{ users: AdminUser[]; total: number }>('/admin/users', { params })
+      .then((r) => r.data),
+  updateRole: (id: string, role: UserRole) =>
+    apiClient
+      .patch<{ user: AdminUser }>(`/admin/users/${id}/role`, { role })
+      .then((r) => r.data.user),
+  deleteUser: (id: string) => apiClient.delete<void>(`/admin/users/${id}`).then((r) => r.data),
+  sessions: (params?: { limit?: number; offset?: number }) =>
+    apiClient
+      .get<{ sessions: AdminSession[]; total: number }>('/admin/sessions', { params })
+      .then((r) => r.data),
+  recentRuns: () =>
+    apiClient
+      .get<{ agentRuns: AdminAgentRun[] }>('/admin/agent-runs/recent')
+      .then((r) => r.data.agentRuns),
+  health: () => apiClient.get<AdminHealth>('/admin/health').then((r) => r.data),
 }
 
 // ── Agent runs ────────────────────────────────────────────────────────────────

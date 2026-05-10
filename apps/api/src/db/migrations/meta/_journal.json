@@ -8,6 +8,13 @@
       "when": 1778153051392,
       "tag": "0000_high_nightmare",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778368301128,
+      "tag": "0001_neat_giant_man",
+      "breakpoints": true
     }
   ]
 }

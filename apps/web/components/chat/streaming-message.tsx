@@ -73,7 +73,7 @@ function ToolCallRow({ tc, index }: { tc: LocalToolCall; index: number }) {
         aria-expanded={open}
       >
         {/* Step number */}
-        <span className="text-[9px] font-mono text-zinc-700 w-4 shrink-0 text-right">{index + 1}</span>
+        <span className="text-[9px] font-mono text-muted-foreground/50 w-4 shrink-0 text-right">{index + 1}</span>
 
         {/* Status icon */}
         {tc.pending
@@ -95,24 +95,24 @@ function ToolCallRow({ tc, index }: { tc: LocalToolCall; index: number }) {
         {tc.pending ? (
           <span className="text-[10px] text-blue-500 animate-pulse shrink-0">running…</span>
         ) : tc.durationMs !== undefined ? (
-          <span className="flex items-center gap-0.5 text-[10px] text-zinc-600 shrink-0">
+          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/70 shrink-0">
             <Clock className="h-2.5 w-2.5" />{tc.durationMs}ms
           </span>
         ) : null}
 
         {open
-          ? <ChevronDown className="h-3 w-3 text-zinc-600 shrink-0" />
-          : <ChevronRight className="h-3 w-3 text-zinc-600 shrink-0" />}
+          ? <ChevronDown className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+          : <ChevronRight className="h-3 w-3 text-muted-foreground/70 shrink-0" />}
       </button>
 
       {open && (
-        <div className="border-t border-white/[0.05] divide-y divide-white/[0.04]">
+        <div className="border-t border-[hsl(var(--glass-border))] divide-y divide-[hsl(var(--glass-border))]">
           {/* Input */}
           <div className="px-3.5 py-2.5">
-            <p className="text-[9px] uppercase tracking-widest font-semibold text-zinc-600 mb-1.5 flex items-center gap-1">
+            <p className="text-[9px] uppercase tracking-widest font-semibold text-muted-foreground/70 mb-1.5 flex items-center gap-1">
               <Terminal className="h-2.5 w-2.5" /> Input
             </p>
-            <pre className="text-[11px] font-mono text-zinc-400 whitespace-pre-wrap break-all leading-relaxed">
+            <pre className="text-[11px] font-mono text-muted-foreground whitespace-pre-wrap break-all leading-relaxed">
               {JSON.stringify(tc.input, null, 2)}
             </pre>
           </div>
@@ -120,13 +120,13 @@ function ToolCallRow({ tc, index }: { tc: LocalToolCall; index: number }) {
           {/* Output */}
           {tc.output !== undefined && (
             <div className="px-3.5 py-2.5">
-              <p className="text-[9px] uppercase tracking-widest font-semibold text-zinc-600 mb-1.5 flex items-center gap-1">
+              <p className="text-[9px] uppercase tracking-widest font-semibold text-muted-foreground/70 mb-1.5 flex items-center gap-1">
                 {tc.success
-                  ? <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" />
-                  : <XCircle className="h-2.5 w-2.5 text-red-500" />}
+                  ? <CheckCircle2 className="h-2.5 w-2.5 text-success" />
+                  : <XCircle className="h-2.5 w-2.5 text-destructive" />}
                 Output
               </p>
-              <pre className="text-[11px] font-mono text-zinc-400 whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">
+              <pre className="text-[11px] font-mono text-muted-foreground whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">
                 {tc.output}
               </pre>
             </div>
@@ -194,8 +194,8 @@ function ActivityTimeline({
 
   return (
     <div className="flex items-center gap-2 px-1 mb-1">
-      <Wrench className="h-3 w-3 text-zinc-600 shrink-0" />
-      <span className="text-[10px] text-zinc-600 font-medium">
+      <Wrench className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+      <span className="text-[10px] text-muted-foreground/70 font-medium">
         {total} action{total !== 1 ? 's' : ''}
       </span>
       {done > 0 && (
@@ -248,7 +248,7 @@ function PhaseIndicator({ phase }: { phase: StreamingMsg['phase'] }) {
           />
         ))}
       </span>
-      <span className="text-xs text-zinc-500">{c.label}</span>
+      <span className="text-xs text-muted-foreground">{c.label}</span>
     </div>
   )
 }
@@ -328,7 +328,7 @@ export function StreamingMessage({ msg }: { msg: StreamingMsg }) {
 
         {/* Final answer */}
         {hasContent && (
-          <div className="rounded-2xl rounded-tl-sm bg-white/[0.04] border border-white/[0.07] px-4 py-3.5 text-sm text-zinc-200">
+          <div className="rounded-2xl rounded-tl-sm bg-[hsl(0_0%_100%/0.04)] border border-[hsl(var(--glass-border))] px-4 py-3.5 text-sm text-foreground/90 shadow-[0_2px_12px_-6px_hsl(0_0%_0%/0.4)]">
             <MarkdownContent content={msg.content} />
             {isActive && <span className="cursor-blink" />}
           </div>

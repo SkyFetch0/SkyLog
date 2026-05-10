@@ -10,6 +10,7 @@ import sessionRoutes from './routes/sessions.js'
 import fileRoutes from './routes/files.js'
 import chatRoutes from './routes/chat.js'
 import agentRoutes from './routes/agents.js'
+import adminRoutes from './routes/admin.js'
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {
@@ -21,6 +22,7 @@ declare module '@fastify/jwt' {
 declare module 'fastify' {
   interface FastifyInstance {
     authenticate: (request: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => Promise<void>
+    requireAdmin: (request: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => Promise<void>
   }
 }
 
@@ -57,6 +59,32 @@ export async function buildServer() {
       await request.jwtVerify()
     } catch (err) {
       return reply.status(401).send({ error: 'Unauthorized' })
+    }
+  })
+
+  // requireAdmin: authenticate + DB'den role kontrol et.
+  // Role JWT'de tutulmaz çünkü demote sonrası eski token hâlâ çalışmamalı.
+  fastify.decorate('requireAdmin', async function (request, reply) {
+    try {
+      await request.jwtVerify()
+    } catch {
+      return reply.status(401).send({ error: 'Unauthorized' })
+    }
+
+    const { sub } = request.user as { sub: string }
+    const { db } = await import('./db/index.js')
+    const { users } = await import('./db/schema.js')
+    const { eq } = await import('drizzle-orm')
+
+    const [user] = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, sub))
+      .limit(1)
+
+    if (!user) return reply.status(401).send({ error: 'User not found' })
+    if (user.role !== 'admin') {
+      return reply.status(403).send({ error: 'Admin access required' })
     }
   })
 
@@ -100,6 +128,7 @@ export async function buildServer() {
   await fastify.register(fileRoutes, { prefix: '/api' })
   await fastify.register(chatRoutes, { prefix: '/api' })
   await fastify.register(agentRoutes, { prefix: '/api' })
+  await fastify.register(adminRoutes, { prefix: '/api/admin' })
 
   // ── Global error handler ──────────────────────────────────────────────────────
   fastify.setErrorHandler((error: import('fastify').FastifyError, request, reply) => {

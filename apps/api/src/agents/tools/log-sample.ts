@@ -51,6 +51,8 @@ export const logSampleTool: AgentTool<Input> = {
       return { success: false, output: '', error: `Path '${resolved}' is not in an allowed directory.` }
     }
 
+    // sandbox.exec already runs the command via `sh -c "<...>"` inside the
+    // container — we only need POSIX-quoted path. No nested `bash -c`.
     const q = JSON.stringify(resolved)
     const n = input.count ?? 100
 
@@ -62,14 +64,12 @@ export const logSampleTool: AgentTool<Input> = {
       case 'tail':
         command = `tail -n ${n} ${q}`
         break
-      case 'random': {
-        // awk-based reservoir sampling: pick N evenly distributed lines
-        const script = `awk 'NR==1{print; next} int(NR % (int(NR/${n})+1))==0{print}' ${q} | head -n ${n}`
-        command = `bash -c ${JSON.stringify(script)}`
+      case 'random':
+        // awk reservoir sampling: pick N evenly distributed lines
+        command = `awk 'NR==1{print; next} int(NR % (int(NR/${n})+1))==0{print}' ${q} | head -n ${n}`
         break
-      }
       case 'errors':
-        command = `bash -c ${JSON.stringify(`grep -iE "error|fail|warn|exception|critical" ${q} | head -n ${n}`)}`
+        command = `grep -iE "error|fail|warn|exception|critical" ${q} | head -n ${n}`
         break
     }
 

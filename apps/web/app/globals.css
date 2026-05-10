@@ -2,60 +2,242 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 8%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 8%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 8%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 215 28% 94%;
-    --secondary-foreground: 222 47% 8%;
-    --muted: 215 28% 94%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 215 28% 94%;
-    --accent-foreground: 222 47% 8%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 215 28% 88%;
-    --input: 215 28% 88%;
-    --ring: 217 91% 60%;
-    --radius: 0.75rem;
-    --sidebar-background: 222 47% 7%;
-    --sidebar-foreground: 215 20% 70%;
-    --sidebar-border: 217 28% 12%;
-    --sidebar-accent: 217 28% 11%;
-    --sidebar-accent-foreground: 210 40% 98%;
-  }
+/*
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *  SkyLog Design Tokens
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ *  Theme palettes are selected by the `data-theme` attribute on <html>:
+ *      <html data-theme="dark">   ← default
+ *      <html data-theme="light">  ← (future)
+ *      <html data-theme="purple"> ← (future)
+ *
+ *  Semantic tokens (surface / elevated / border / accent) decouple components
+ *  from raw color values so adding a new palette is ~30 lines of CSS.
+ *
+ *  All values are HSL triplets (no hsl() wrapper) so Tailwind's
+ *  `bg-background`, `text-foreground`, etc. can compose with /<alpha>.
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
 
-  .dark {
-    --background: 222 47% 5%;
+@layer base {
+  /* ─── Default palette: DARK ──────────────────────────────────────────────── */
+  :root,
+  [data-theme="dark"] {
+    /* Base canvas */
+    --background: 222 47% 4%;
     --foreground: 210 40% 96%;
-    --card: 222 40% 7%;
-    --card-foreground: 210 40% 96%;
-    --popover: 222 40% 7%;
-    --popover-foreground: 210 40% 96%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217 28% 12%;
-    --secondary-foreground: 210 40% 96%;
-    --muted: 217 28% 12%;
-    --muted-foreground: 215 20% 55%;
-    --accent: 217 28% 14%;
-    --accent-foreground: 210 40% 96%;
-    --destructive: 0 62% 40%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 28% 12%;
-    --input: 217 28% 12%;
-    --ring: 217 91% 60%;
-    --sidebar-background: 222 50% 4%;
+
+    /* Surface elevations (chat balon, kart, input vb.) */
+    --surface-1: 222 40% 6%;          /* en koyu kart */
+    --surface-2: 222 36% 9%;          /* hover / elevated */
+    --surface-3: 222 32% 12%;         /* en üst eleve */
+
+    /* Sidebar / app shell */
+    --sidebar-background: 222 50% 3%;
     --sidebar-foreground: 215 20% 65%;
     --sidebar-border: 217 32% 9%;
     --sidebar-accent: 217 32% 8%;
     --sidebar-accent-foreground: 210 40% 98%;
+
+    /* Cards & popovers (shadcn uyumu) */
+    --card: 222 40% 7%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 38% 8%;
+    --popover-foreground: 210 40% 96%;
+
+    /* Brand */
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 217 91% 60% / 0.12;
+    --primary-glow: 217 91% 60% / 0.35;
+
+    /* Accent (sub-agent, highlight) */
+    --accent: 217 28% 14%;
+    --accent-foreground: 210 40% 96%;
+
+    /* Secondary / muted */
+    --secondary: 217 28% 12%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 28% 11%;
+    --muted-foreground: 215 18% 55%;
+
+    /* Status renkleri */
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 222 47% 8%;
+    --info: 199 89% 55%;
+
+    /* Borders / lines */
+    --border: 217 28% 13%;
+    --border-strong: 217 28% 18%;
+    --input: 217 28% 14%;
+    --ring: 217 91% 60%;
+
+    /* Glass / overlay */
+    --glass-bg: 0 0% 100% / 0.04;
+    --glass-border: 0 0% 100% / 0.08;
+    --glass-bg-strong: 0 0% 100% / 0.06;
+
+    /* Radius */
+    --radius: 0.875rem;
+    --radius-sm: 0.5rem;
+    --radius-lg: 1.25rem;
+  }
+
+  /* ─── Light palette ──────────────────────────────────────────────────────── */
+  [data-theme="light"] {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 8%;
+
+    --surface-1: 215 28% 97%;
+    --surface-2: 215 28% 94%;
+    --surface-3: 215 28% 90%;
+
+    --sidebar-background: 215 28% 97%;
+    --sidebar-foreground: 222 30% 30%;
+    --sidebar-border: 215 28% 88%;
+    --sidebar-accent: 215 28% 92%;
+    --sidebar-accent-foreground: 222 47% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 8%;
+
+    --primary: 217 91% 55%;
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 217 91% 55% / 0.10;
+    --primary-glow: 217 91% 55% / 0.30;
+
+    --accent: 215 28% 92%;
+    --accent-foreground: 222 47% 8%;
+    --secondary: 215 28% 94%;
+    --secondary-foreground: 222 47% 8%;
+    --muted: 215 28% 94%;
+    --muted-foreground: 215 16% 40%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 71% 38%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 48%;
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 48%;
+
+    --border: 215 28% 88%;
+    --border-strong: 215 28% 80%;
+    --input: 215 28% 92%;
+    --ring: 217 91% 55%;
+
+    --glass-bg: 222 47% 8% / 0.04;
+    --glass-border: 222 47% 8% / 0.08;
+    --glass-bg-strong: 222 47% 8% / 0.06;
+  }
+
+  [data-theme="light"] html { color-scheme: light; }
+
+  /* ─── Purple palette ─────────────────────────────────────────────────────── */
+  [data-theme="purple"] {
+    --background: 270 35% 6%;
+    --foreground: 270 20% 96%;
+
+    --surface-1: 270 30% 9%;
+    --surface-2: 270 28% 12%;
+    --surface-3: 270 26% 15%;
+
+    --sidebar-background: 270 38% 4%;
+    --sidebar-foreground: 270 18% 65%;
+    --sidebar-border: 270 28% 11%;
+    --sidebar-accent: 270 28% 10%;
+    --sidebar-accent-foreground: 270 20% 98%;
+
+    --card: 270 30% 10%;
+    --card-foreground: 270 20% 96%;
+    --popover: 270 30% 10%;
+    --popover-foreground: 270 20% 96%;
+
+    --primary: 270 91% 65%;
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 270 91% 65% / 0.12;
+    --primary-glow: 270 91% 65% / 0.35;
+
+    --accent: 270 28% 17%;
+    --accent-foreground: 270 20% 96%;
+    --secondary: 270 28% 14%;
+    --secondary-foreground: 270 20% 96%;
+    --muted: 270 28% 13%;
+    --muted-foreground: 270 15% 60%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 270 47% 8%;
+    --info: 290 89% 65%;
+
+    --border: 270 28% 15%;
+    --border-strong: 270 28% 22%;
+    --input: 270 28% 16%;
+    --ring: 270 91% 65%;
+
+    --glass-bg: 0 0% 100% / 0.04;
+    --glass-border: 0 0% 100% / 0.08;
+    --glass-bg-strong: 0 0% 100% / 0.06;
+  }
+
+  /* ─── Ocean palette ──────────────────────────────────────────────────────── */
+  [data-theme="ocean"] {
+    --background: 200 50% 5%;
+    --foreground: 195 30% 96%;
+
+    --surface-1: 200 45% 8%;
+    --surface-2: 200 42% 11%;
+    --surface-3: 200 38% 14%;
+
+    --sidebar-background: 200 55% 4%;
+    --sidebar-foreground: 195 18% 65%;
+    --sidebar-border: 200 35% 10%;
+    --sidebar-accent: 200 35% 9%;
+    --sidebar-accent-foreground: 195 30% 98%;
+
+    --card: 200 45% 9%;
+    --card-foreground: 195 30% 96%;
+    --popover: 200 45% 9%;
+    --popover-foreground: 195 30% 96%;
+
+    --primary: 180 85% 55%;
+    --primary-foreground: 200 47% 8%;
+    --primary-soft: 180 85% 55% / 0.12;
+    --primary-glow: 180 85% 55% / 0.35;
+
+    --accent: 200 35% 16%;
+    --accent-foreground: 195 30% 96%;
+    --secondary: 200 35% 13%;
+    --secondary-foreground: 195 30% 96%;
+    --muted: 200 32% 12%;
+    --muted-foreground: 200 15% 60%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 160 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 200 47% 8%;
+    --info: 195 89% 60%;
+
+    --border: 200 32% 14%;
+    --border-strong: 200 32% 22%;
+    --input: 200 32% 15%;
+    --ring: 180 85% 55%;
+
+    --glass-bg: 0 0% 100% / 0.04;
+    --glass-border: 0 0% 100% / 0.08;
+    --glass-bg-strong: 0 0% 100% / 0.06;
   }
 }
 
@@ -63,42 +245,118 @@
   * {
     @apply border-border;
   }
+
+  html {
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
-    @apply bg-background text-foreground antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+  }
+
+  /* Daha pürüzsüz odak halkası */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Selection rengi */
+  ::selection {
+    @apply bg-primary/30 text-foreground;
   }
 }
 
-/* Premium scrollbar */
-::-webkit-scrollbar { width: 4px; height: 4px; }
+/* ─── Premium scrollbar ─────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { @apply bg-white/10 rounded-full; }
-::-webkit-scrollbar-thumb:hover { @apply bg-white/20; }
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border-strong));
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
 
-/* Smooth fade-in for messages */
+/* ─── Animations ────────────────────────────────────────────────────────────── */
+
 @keyframes fadeSlideUp {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .msg-enter { animation: fadeSlideUp 0.25s ease-out both; }
 
-/* Typing cursor blink */
 @keyframes blink { 0%,100% { opacity:1 } 50% { opacity:0 } }
 .cursor-blink::after {
   content: "▋";
-  @apply text-blue-400;
+  color: hsl(var(--primary));
   animation: blink 0.9s step-start infinite;
   margin-left: 1px;
 }
 
-/* Glass morphism card */
-.glass {
-  background: rgba(255,255,255,0.05);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,0.08);
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--surface-1)) 0%,
+    hsl(var(--surface-2)) 50%,
+    hsl(var(--surface-1)) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
 }
 
-/* Gradient text */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
+  50%      { box-shadow: 0 0 0 6px hsl(var(--primary) / 0); }
+}
+.glow-pulse { animation: glow-pulse 2s ease-in-out infinite; }
+
+/* ─── Utility classes ──────────────────────────────────────────────────────── */
+
+/* Glassmorphism — buton/kart için soft blur tabanlı yüzey */
+.glass {
+  background: hsl(var(--glass-bg));
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  border: 1px solid hsl(var(--glass-border));
+}
+.glass-strong {
+  background: hsl(var(--glass-bg-strong));
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid hsl(var(--glass-border));
+}
+
+/* Gradient text (logo, başlık) */
 .gradient-text {
-  @apply bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent;
+  background-image: linear-gradient(
+    135deg,
+    hsl(var(--primary)) 0%,
+    hsl(199 89% 55%) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Soft hover lift — kartlar için */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 32px -12px hsl(var(--primary) / 0.25);
+}
+
+/* Auth sayfası arka plan glow'u */
+.auth-bg {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, hsl(var(--primary) / 0.15), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 60%, hsl(199 89% 55% / 0.08), transparent),
+    hsl(var(--background));
 }

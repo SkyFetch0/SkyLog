@@ -4,10 +4,11 @@ import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { toast } from 'sonner'
 import {
   ChevronRight, ChevronDown,
-  Brain, CheckCircle2, XCircle, Loader2, Wrench,
-  Clock, Terminal, Bot, GitBranch,
+  Brain, CheckCircle2, XCircle, Wrench,
+  Clock, Terminal, Bot, GitBranch, Copy, Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Message as MsgType } from '@/lib/types'
@@ -109,7 +110,7 @@ export function ToolCallCard({ tc, index }: { tc: LocalToolCall; index: number }
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <span className="text-[9px] font-mono text-zinc-700 w-4 shrink-0 text-right">{(index ?? 0) + 1}</span>
+        <span className="text-[9px] font-mono text-muted-foreground/50 w-4 shrink-0 text-right">{(index ?? 0) + 1}</span>
 
         {tc.success === false
           ? <XCircle className="h-3 w-3 text-red-400 shrink-0" />
@@ -124,35 +125,35 @@ export function ToolCallCard({ tc, index }: { tc: LocalToolCall; index: number }
         </span>
 
         {tc.durationMs !== undefined && (
-          <span className="flex items-center gap-0.5 text-[10px] text-zinc-600 shrink-0">
+          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/70 shrink-0">
             <Clock className="h-2.5 w-2.5" />{tc.durationMs}ms
           </span>
         )}
 
         {open
-          ? <ChevronDown className="h-3 w-3 text-zinc-600 shrink-0" />
-          : <ChevronRight className="h-3 w-3 text-zinc-600 shrink-0" />}
+          ? <ChevronDown className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+          : <ChevronRight className="h-3 w-3 text-muted-foreground/70 shrink-0" />}
       </button>
 
       {open && (
-        <div className="border-t border-white/[0.05] divide-y divide-white/[0.04]">
+        <div className="border-t border-[hsl(var(--glass-border))] divide-y divide-[hsl(var(--glass-border))]">
           <div className="px-3.5 py-2.5">
-            <p className="text-[9px] uppercase tracking-widest font-semibold text-zinc-600 mb-1.5 flex items-center gap-1">
+            <p className="text-[9px] uppercase tracking-widest font-semibold text-muted-foreground/70 mb-1.5 flex items-center gap-1">
               <Terminal className="h-2.5 w-2.5" /> Input
             </p>
-            <pre className="text-[11px] font-mono text-zinc-400 whitespace-pre-wrap break-all leading-relaxed">
+            <pre className="text-[11px] font-mono text-muted-foreground whitespace-pre-wrap break-all leading-relaxed">
               {JSON.stringify(tc.input, null, 2)}
             </pre>
           </div>
           {tc.output !== undefined && (
             <div className="px-3.5 py-2.5">
-              <p className="text-[9px] uppercase tracking-widest font-semibold text-zinc-600 mb-1.5 flex items-center gap-1">
+              <p className="text-[9px] uppercase tracking-widest font-semibold text-muted-foreground/70 mb-1.5 flex items-center gap-1">
                 {tc.success === false
-                  ? <XCircle className="h-2.5 w-2.5 text-red-500" />
-                  : <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" />}
+                  ? <XCircle className="h-2.5 w-2.5 text-destructive" />
+                  : <CheckCircle2 className="h-2.5 w-2.5 text-success" />}
                 Output
               </p>
-              <pre className="text-[11px] font-mono text-zinc-400 whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">
+              <pre className="text-[11px] font-mono text-muted-foreground whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">
                 {tc.output}
               </pre>
             </div>
@@ -213,8 +214,8 @@ function ActivitySummary({
 
   return (
     <div className="flex items-center gap-2 px-1 mb-1">
-      <Wrench className="h-3 w-3 text-zinc-600 shrink-0" />
-      <span className="text-[10px] text-zinc-600 font-medium">
+      <Wrench className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+      <span className="text-[10px] text-muted-foreground/70 font-medium">
         {total} action{total !== 1 ? 's' : ''}
       </span>
       {failed > 0 && (
@@ -234,7 +235,7 @@ function ActivitySummary({
 export function UserMessage({ message }: { message: MsgType }) {
   return (
     <div className="flex justify-end mb-5 msg-enter">
-      <div className="max-w-[78%] rounded-2xl rounded-tr-sm bg-gradient-to-br from-blue-600 to-blue-700 px-4 py-3 text-sm text-white shadow-lg shadow-blue-500/10">
+      <div className="max-w-[78%] rounded-2xl rounded-tr-sm bg-gradient-to-br from-primary to-[hsl(217_91%_50%)] px-4 py-3 text-sm text-primary-foreground shadow-soft">
         <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
       </div>
     </div>
@@ -287,11 +288,49 @@ export function AssistantMessage({ message }: { message: MsgType }) {
         )}
 
         {/* Final answer */}
-        <div className="rounded-2xl rounded-tl-sm bg-white/[0.04] border border-white/[0.07] px-4 py-3.5 text-sm text-zinc-200">
+        <div className="group/answer relative rounded-2xl rounded-tl-sm bg-[hsl(0_0%_100%/0.04)] border border-[hsl(var(--glass-border))] px-4 py-3.5 text-sm text-foreground/90 shadow-[0_2px_12px_-6px_hsl(0_0%_0%/0.4)]">
           <MarkdownContent content={message.content} />
+          <CopyButton text={message.content} />
         </div>
       </div>
     </div>
+  )
+}
+
+// ── Copy-to-clipboard button (asistan mesajları için) ────────────────────────
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      toast.success('Copied to clipboard')
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error('Failed to copy')
+    }
+  }
+
+  if (!text) return null
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className={cn(
+        'absolute top-2 right-2 p-1.5 rounded-lg transition-all duration-200',
+        'opacity-0 group-hover/answer:opacity-100 focus-visible:opacity-100',
+        copied
+          ? 'text-success bg-success/10 border border-success/20'
+          : 'text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_100%/0.06)] border border-transparent',
+      )}
+      aria-label={copied ? 'Copied' : 'Copy message'}
+      title={copied ? 'Copied!' : 'Copy message'}
+    >
+      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+    </button>
   )
 }
 

@@ -43,11 +43,11 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#070b14] flex flex-col">
-      {/* Background glow */}
+    <div className="min-h-screen auth-bg flex flex-col">
+      {/* Background glow (extra) */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full bg-blue-600/10 blur-[120px]" />
-        <div className="absolute bottom-0 -left-40 w-[500px] h-[500px] rounded-full bg-cyan-600/8 blur-[100px]" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full bg-primary/10 blur-[120px]" />
+        <div className="absolute bottom-0 -left-40 w-[500px] h-[500px] rounded-full bg-[hsl(199_89%_55%/0.08)] blur-[100px]" />
       </div>
 
       <div className="flex-1 flex items-center justify-center p-4 relative z-10">

@@ -43,11 +43,15 @@ export const logStatsTool: AgentTool<Input> = {
       return { success: false, output: '', error: `Path '${resolved}' is not in an allowed directory.` }
     }
 
+    // sandbox.exec wraps the command in `sh -c "<...>"` itself, so we just
+    // build a single shell script string. No outer bash -c / JSON.stringify
+    // needed — that caused triple-escape failures previously.
+    const q = JSON.stringify(resolved)  // POSIX-safe quoting for the path
     const script = [
-      `LINES=$(wc -l < ${JSON.stringify(resolved)} 2>/dev/null || echo 0)`,
-      `SIZE=$(wc -c < ${JSON.stringify(resolved)} 2>/dev/null || echo 0)`,
-      `FIRST=$(head -1 ${JSON.stringify(resolved)} 2>/dev/null || echo '')`,
-      `LAST=$(tail -1 ${JSON.stringify(resolved)} 2>/dev/null || echo '')`,
+      `LINES=$(wc -l < ${q} 2>/dev/null || echo 0)`,
+      `SIZE=$(wc -c < ${q} 2>/dev/null || echo 0)`,
+      `FIRST=$(head -1 ${q} 2>/dev/null || echo '')`,
+      `LAST=$(tail -1 ${q} 2>/dev/null || echo '')`,
       `echo "LINES=$LINES"`,
       `echo "SIZE=$SIZE"`,
       `echo "FIRST=$FIRST"`,
@@ -55,10 +59,14 @@ export const logStatsTool: AgentTool<Input> = {
     ].join('\n')
 
     try {
-      const { stdout, exitCode } = await ctx.sandbox.exec(`/bin/bash -c ${JSON.stringify(script)}`)
+      const { stdout, stderr, exitCode } = await ctx.sandbox.exec(script)
 
       if (exitCode !== 0) {
-        return { success: false, output: '', error: `Stats command failed (exit ${exitCode})` }
+        return {
+          success: false,
+          output: '',
+          error: `Stats command failed (exit ${exitCode})${stderr ? `: ${stderr.trim()}` : ''}`,
+        }
       }
 
       const get = (key: string) => {

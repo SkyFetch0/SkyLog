@@ -8,6 +8,16 @@ import { sandbox } from '../sandbox.js'
 import { AgentRunner } from '../agents/runner.js'
 import type { AgentEvent } from '../agents/runner.js'
 import { AppError } from '../lib/errors.js'
+import { createRateLimit } from '../lib/rate-limit.js'
+
+// Per-user mesaj rate limit. JWT verify edildiği için key user-id olur.
+// Anthropic maliyet patlamasına karşı koruma + tek kullanıcının
+// tüm semafor slotlarını yememesi için.
+const messageRateLimit = createRateLimit({
+  windowMs: 60_000,
+  max: 30,
+  message: 'Too many messages. Please wait a moment.',
+})
 
 const sendMessageSchema = z.object({
   content: z.string().min(1).max(32_000),
@@ -15,10 +25,13 @@ const sendMessageSchema = z.object({
 })
 
 export default async function chatRoutes(fastify: FastifyInstance) {
-  const auth = { onRequest: [fastify.authenticate] }
-
   // ── POST /sessions/:id/messages (SSE stream) ──────────────────────────────────
-  fastify.post('/sessions/:id/messages', auth, async (request, reply) => {
+  // Auth + rate limit. Auth `onRequest` hook'unda olduğu için preHandler'a
+  // ulaştığında request.user dolu olur ve rate-limit user-id ile çalışır.
+  fastify.post(
+    '/sessions/:id/messages',
+    { onRequest: [fastify.authenticate], preHandler: [messageRateLimit] },
+    async (request, reply) => {
     const { sub } = request.user as { sub: string }
     const { id: sessionId } = request.params as { id: string }
 
