@@ -243,6 +243,42 @@ function dispatchEvent(
     case 'sub_agent_spawned':
       send({ type: 'sub_agent_spawned', agentId: event.agentId, role: event.role, task: event.task })
       break
+    // ── Sub-agent live event forwarding ──────────────────────────────────
+    case 'sub_agent_thinking':
+      send({ type: 'sub_agent_thinking', agentId: event.agentId, content: event.delta })
+      break
+    case 'sub_agent_text_delta':
+      send({ type: 'sub_agent_text_delta', agentId: event.agentId, content: event.delta })
+      break
+    case 'sub_agent_tool_use':
+      send({
+        type: 'sub_agent_tool_use',
+        agentId: event.agentId,
+        tool: event.toolName,
+        toolUseId: event.toolUseId,
+        input: event.input,
+      })
+      break
+    case 'sub_agent_tool_result':
+      send({
+        type: 'sub_agent_tool_result',
+        agentId: event.agentId,
+        toolUseId: event.toolUseId,
+        tool: event.toolName,
+        success: event.success,
+        output: event.output.slice(0, 2000),
+      })
+      break
+    case 'sub_agent_completed':
+      send({
+        type: 'sub_agent_completed',
+        agentId: event.agentId,
+        result: event.result.slice(0, 8000),
+        tokensUsed: event.tokensUsed,
+        success: event.success,
+        error: event.error,
+      })
+      break
     case 'completed':
       send({ type: 'completed', message: event.result, tokensUsed: event.tokensUsed })
       break

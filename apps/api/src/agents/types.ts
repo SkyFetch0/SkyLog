@@ -23,6 +23,10 @@ export interface SandboxManager {
   exec(command: string, options?: SandboxExecOptions): Promise<{ stdout: string; stderr: string; exitCode: number }>
   agentUser(agentId: string): string
   agentWorkdir(sessionId: string, agentId: string): string
+  // Idempotent: creates the sandbox UNIX user + per-agent workdir if missing.
+  // Required before a sub-agent's tools (read_file / log_grep / write_file …)
+  // can resolve paths inside its agentWorkdir.
+  ensureAgentUser(sessionId: string, agentId: string): Promise<void>
 }
 
 // ── Context passed to every tool.execute() ────────────────────────────────────

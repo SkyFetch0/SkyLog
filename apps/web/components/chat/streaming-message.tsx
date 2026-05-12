@@ -137,37 +137,247 @@ function ToolCallRow({ tc, index }: { tc: LocalToolCall; index: number }) {
   )
 }
 
-// ── Sub-agent badge ───────────────────────────────────────────────────────────
+// ── Sub-agent card with live nested "sub-task" view (Cursor-style) ────────────
+//
+// Click the card → expands into a compact "agent-inside-an-agent" panel:
+//   1. Task description
+//   2. Live thinking block
+//   3. Tool call timeline (each tool the sub-agent fires, with input/output)
+//   4. Streamed text response
+//   5. Final result (after sub_agent_completed)
+//
+// All four sections stream in real-time as sub_agent_* SSE events arrive.
 
 function SubAgentRow({ agent, index }: { agent: LocalSubAgent; index: number }) {
   const [open, setOpen] = useState(false)
 
+  const running = agent.status === 'running'
+  const failed = agent.status === 'failed'
+
+  // Border + accent color tracks status
+  const tone = failed
+    ? 'border-red-500/25 bg-red-500/[0.03]'
+    : running
+    ? 'border-amber-500/25 bg-amber-500/[0.04]'
+    : 'border-emerald-500/20 bg-emerald-500/[0.03]'
+
+  const statusBadge = failed
+    ? { label: 'failed',    cls: 'bg-red-500/10 text-red-400 border-red-500/20' }
+    : running
+    ? { label: 'running',   cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse' }
+    : { label: 'done',      cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' }
+
+  const toolCount   = agent.toolCalls.length
+  const toolDone    = agent.toolCalls.filter((t) => !t.pending).length
+  const toolPending = toolCount - toolDone
+
   return (
-    <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.03] overflow-hidden">
+    <div className={cn('rounded-xl border overflow-hidden transition-all', tone)}>
       <button
-        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-amber-500/[0.05] transition-colors"
+        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:brightness-110 transition-all"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <GitBranch className="h-3 w-3 text-amber-400 shrink-0" />
-        <Bot className="h-3 w-3 text-amber-400/70 shrink-0" />
-        <span className="text-[11px] font-medium text-amber-300 flex-1 truncate">
+        <GitBranch className={cn('h-3 w-3 shrink-0', failed ? 'text-red-400' : running ? 'text-amber-400' : 'text-emerald-400')} />
+        <Bot className={cn('h-3 w-3 shrink-0', failed ? 'text-red-400/70' : running ? 'text-amber-400/70' : 'text-emerald-400/70')} />
+        <span className={cn(
+          'text-[11px] font-medium flex-1 truncate',
+          failed ? 'text-red-300' : running ? 'text-amber-300' : 'text-emerald-300',
+        )}>
           {agent.role}
         </span>
-        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold uppercase tracking-wider shrink-0">
-          sub-agent #{index + 1}
+
+        {/* Live tool counter while running */}
+        {toolCount > 0 && (
+          <span className="text-[10px] text-muted-foreground/70 font-mono shrink-0">
+            {toolDone}/{toolCount} tools
+          </span>
+        )}
+
+        <span className={cn(
+          'text-[9px] px-1.5 py-0.5 rounded-md border font-semibold uppercase tracking-wider shrink-0',
+          statusBadge.cls,
+        )}>
+          {statusBadge.label}
         </span>
+
+        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-muted/20 border border-[hsl(var(--glass-border))] text-muted-foreground font-mono shrink-0">
+          #{index + 1}
+        </span>
+
         {open
-          ? <ChevronDown className="h-3 w-3 text-amber-600 shrink-0" />
-          : <ChevronRight className="h-3 w-3 text-amber-600 shrink-0" />}
+          ? <ChevronDown className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+          : <ChevronRight className="h-3 w-3 text-muted-foreground/70 shrink-0" />}
       </button>
 
       {open && (
-        <div className="px-3.5 pb-3 border-t border-amber-500/10 pt-2.5">
-          <p className="text-[9px] uppercase tracking-widest font-semibold text-amber-700 mb-1.5">Task</p>
-          <p className="text-[11px] text-amber-300/70 leading-relaxed font-mono whitespace-pre-wrap break-words">
-            {agent.task}
+        <SubAgentDetails agent={agent} live={running} toolPending={toolPending} />
+      )}
+    </div>
+  )
+}
+
+function SubAgentDetails({
+  agent,
+  live,
+  toolPending,
+}: {
+  agent: LocalSubAgent
+  live: boolean
+  toolPending: number
+}) {
+  return (
+    <div className="border-t border-[hsl(var(--glass-border))] divide-y divide-[hsl(var(--glass-border))] bg-background/30">
+      {/* Task */}
+      <div className="px-3.5 py-2.5">
+        <p className="text-[9px] uppercase tracking-widest font-semibold text-muted-foreground/70 mb-1.5">Task</p>
+        <p className="text-[11px] text-foreground/80 leading-relaxed whitespace-pre-wrap break-words">
+          {agent.task}
+        </p>
+      </div>
+
+      {/* Sub-agent's own thinking */}
+      {agent.thinkingContent && (
+        <div className="px-3.5 py-2.5">
+          <details>
+            <summary className="cursor-pointer text-[9px] uppercase tracking-widest font-semibold text-violet-400/80 flex items-center gap-1 mb-1.5">
+              <Brain className={cn('h-2.5 w-2.5', live && !agent.content && 'animate-pulse')} />
+              Reasoning ({agent.thinkingContent.length} chars)
+            </summary>
+            <pre className="text-[10px] font-mono text-violet-300/50 whitespace-pre-wrap break-words leading-relaxed max-h-40 overflow-y-auto scrollbar-thin mt-1.5">
+              {agent.thinkingContent}
+            </pre>
+          </details>
+        </div>
+      )}
+
+      {/* Sub-agent's tool timeline */}
+      {agent.toolCalls.length > 0 && (
+        <div className="px-3.5 py-2.5">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Wrench className="h-2.5 w-2.5 text-muted-foreground/70" />
+            <p className="text-[9px] uppercase tracking-widest font-semibold text-muted-foreground/70">
+              Tool activity
+            </p>
+            {toolPending > 0 && (
+              <span className="text-[10px] text-blue-500 animate-pulse">{toolPending} running</span>
+            )}
+          </div>
+          <div className="space-y-1">
+            {agent.toolCalls.map((tc, idx) => (
+              <SubAgentToolRow key={tc.id} tc={tc} index={idx} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Streamed text (response from the sub-agent) */}
+      {agent.content && (
+        <div className="px-3.5 py-2.5">
+          <p className="text-[9px] uppercase tracking-widest font-semibold text-muted-foreground/70 mb-1.5">
+            Response
           </p>
+          <pre className="text-[11px] font-mono text-foreground/85 whitespace-pre-wrap break-words leading-relaxed max-h-64 overflow-y-auto scrollbar-thin">
+            {agent.content}
+            {live && <span className="cursor-blink" />}
+          </pre>
+        </div>
+      )}
+
+      {/* Final result (JSON or text) — only after sub_agent_completed */}
+      {!live && agent.result && (
+        <div className="px-3.5 py-2.5">
+          <p className="text-[9px] uppercase tracking-widest font-semibold text-muted-foreground/70 mb-1.5 flex items-center gap-1">
+            <CheckCircle2 className="h-2.5 w-2.5 text-success" />
+            Final result
+            {agent.tokensUsed !== undefined && (
+              <span className="ml-2 text-muted-foreground/60 font-mono normal-case tracking-normal">
+                {agent.tokensUsed.toLocaleString()} tok
+              </span>
+            )}
+            {agent.durationMs !== undefined && (
+              <span className="text-muted-foreground/60 font-mono normal-case tracking-normal">
+                · {(agent.durationMs / 1000).toFixed(1)}s
+              </span>
+            )}
+          </p>
+          <pre className="text-[10px] font-mono text-foreground/75 whitespace-pre-wrap break-all leading-relaxed max-h-72 overflow-y-auto scrollbar-thin bg-[hsl(var(--surface-2))] rounded-lg p-2.5">
+            {agent.result}
+          </pre>
+        </div>
+      )}
+
+      {/* Error */}
+      {agent.error && (
+        <div className="px-3.5 py-2.5 bg-red-500/[0.03]">
+          <p className="text-[9px] uppercase tracking-widest font-semibold text-red-400 mb-1.5">Error</p>
+          <p className="text-[11px] text-red-300/80 leading-relaxed whitespace-pre-wrap break-words font-mono">
+            {agent.error}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Compact tool row used INSIDE a sub-agent's detail panel. Smaller than the
+// top-level ToolCallRow so the nested view doesn't dominate the chat.
+function SubAgentToolRow({ tc, index }: { tc: LocalToolCall; index: number }) {
+  const [open, setOpen] = useState(false)
+  const icon = TOOL_ICONS[tc.toolName] ?? '🔧'
+
+  const tone = tc.pending
+    ? 'border-blue-500/25 bg-blue-500/[0.04]'
+    : tc.success
+    ? 'border-emerald-500/15 bg-emerald-500/[0.02]'
+    : 'border-red-500/20 bg-red-500/[0.03]'
+
+  return (
+    <div className={cn('rounded-lg border overflow-hidden text-[10px]', tone)}>
+      <button
+        type="button"
+        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:brightness-110 transition-all"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span className="text-[9px] font-mono text-muted-foreground/50 w-3 shrink-0 text-right">{index + 1}</span>
+        {tc.pending
+          ? <Loader2 className="h-2.5 w-2.5 animate-spin text-blue-400 shrink-0" />
+          : tc.success
+          ? <CheckCircle2 className="h-2.5 w-2.5 text-emerald-400 shrink-0" />
+          : <XCircle className="h-2.5 w-2.5 text-red-400 shrink-0" />}
+        <span className="shrink-0 text-[10px]">{icon}</span>
+        <span className={cn(
+          'font-mono font-medium flex-1 truncate',
+          tc.pending ? 'text-blue-300' : tc.success ? 'text-emerald-300/90' : 'text-red-300',
+        )}>
+          {tc.toolName}
+        </span>
+        {tc.pending ? (
+          <span className="text-[9px] text-blue-500 animate-pulse shrink-0">…</span>
+        ) : tc.durationMs !== undefined ? (
+          <span className="text-[9px] text-muted-foreground/70 font-mono shrink-0">{tc.durationMs}ms</span>
+        ) : null}
+        {open
+          ? <ChevronDown className="h-2.5 w-2.5 text-muted-foreground/70 shrink-0" />
+          : <ChevronRight className="h-2.5 w-2.5 text-muted-foreground/70 shrink-0" />}
+      </button>
+      {open && (
+        <div className="border-t border-[hsl(var(--glass-border))] divide-y divide-[hsl(var(--glass-border))]">
+          <div className="px-2.5 py-2">
+            <p className="text-[8px] uppercase tracking-widest font-semibold text-muted-foreground/60 mb-1">Input</p>
+            <pre className="text-[10px] font-mono text-muted-foreground whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">
+              {JSON.stringify(tc.input, null, 2)}
+            </pre>
+          </div>
+          {tc.output !== undefined && (
+            <div className="px-2.5 py-2">
+              <p className="text-[8px] uppercase tracking-widest font-semibold text-muted-foreground/60 mb-1">Output</p>
+              <pre className="text-[10px] font-mono text-muted-foreground whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">
+                {tc.output}
+              </pre>
+            </div>
+          )}
         </div>
       )}
     </div>

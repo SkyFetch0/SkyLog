@@ -166,34 +166,197 @@ export function ToolCallCard({ tc, index }: { tc: LocalToolCall; index: number }
   )
 }
 
-// ── Sub-agent card (kalıcı) ───────────────────────────────────────────────────
+// ── Sub-agent card (kalıcı — post-stream görünüm) ─────────────────────────────
+// Mirror of the live SubAgentRow in streaming-message.tsx but without the
+// pending/loader states. Renders the same nested "sub-task" panel: task,
+// thinking, tool timeline, final result.
 
 function SubAgentCard({ agent, index }: { agent: LocalSubAgent; index: number }) {
   const [open, setOpen] = useState(false)
 
+  const failed = agent.status === 'failed'
+  const tone = failed
+    ? 'border-red-500/20 bg-red-500/[0.03]'
+    : 'border-emerald-500/20 bg-emerald-500/[0.03]'
+
+  const statusBadge = failed
+    ? { label: 'failed', cls: 'bg-red-500/10 text-red-400 border-red-500/20' }
+    : { label: 'done',   cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' }
+
   return (
-    <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.03] overflow-hidden">
+    <div className={cn('rounded-xl border overflow-hidden', tone)}>
       <button
-        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-amber-500/[0.05] transition-colors"
+        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:brightness-110 transition-all"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <GitBranch className="h-3 w-3 text-amber-400 shrink-0" />
-        <Bot className="h-3 w-3 text-amber-400/70 shrink-0" />
-        <span className="text-[11px] font-medium text-amber-300 flex-1 truncate">{agent.role}</span>
-        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold uppercase tracking-wider shrink-0">
-          sub-agent #{index + 1}
+        <GitBranch className={cn('h-3 w-3 shrink-0', failed ? 'text-red-400' : 'text-emerald-400')} />
+        <Bot className={cn('h-3 w-3 shrink-0', failed ? 'text-red-400/70' : 'text-emerald-400/70')} />
+        <span className={cn(
+          'text-[11px] font-medium flex-1 truncate',
+          failed ? 'text-red-300' : 'text-emerald-300',
+        )}>
+          {agent.role}
+        </span>
+        {agent.toolCalls.length > 0 && (
+          <span className="text-[10px] text-muted-foreground/70 font-mono shrink-0">
+            {agent.toolCalls.length} tool{agent.toolCalls.length !== 1 ? 's' : ''}
+          </span>
+        )}
+        <span className={cn(
+          'text-[9px] px-1.5 py-0.5 rounded-md border font-semibold uppercase tracking-wider shrink-0',
+          statusBadge.cls,
+        )}>
+          {statusBadge.label}
+        </span>
+        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-muted/20 border border-[hsl(var(--glass-border))] text-muted-foreground font-mono shrink-0">
+          #{index + 1}
         </span>
         {open
-          ? <ChevronDown className="h-3 w-3 text-amber-600 shrink-0" />
-          : <ChevronRight className="h-3 w-3 text-amber-600 shrink-0" />}
+          ? <ChevronDown className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+          : <ChevronRight className="h-3 w-3 text-muted-foreground/70 shrink-0" />}
+      </button>
+
+      {open && (
+        <div className="border-t border-[hsl(var(--glass-border))] divide-y divide-[hsl(var(--glass-border))] bg-background/30">
+          {/* Task */}
+          <div className="px-3.5 py-2.5">
+            <p className="text-[9px] uppercase tracking-widest font-semibold text-muted-foreground/70 mb-1.5">Task</p>
+            <p className="text-[11px] text-foreground/80 leading-relaxed whitespace-pre-wrap break-words">
+              {agent.task}
+            </p>
+          </div>
+
+          {/* Thinking */}
+          {agent.thinkingContent && (
+            <div className="px-3.5 py-2.5">
+              <details>
+                <summary className="cursor-pointer text-[9px] uppercase tracking-widest font-semibold text-violet-400/80 flex items-center gap-1 mb-1.5">
+                  <Brain className="h-2.5 w-2.5" />
+                  Reasoning ({agent.thinkingContent.length} chars)
+                </summary>
+                <pre className="text-[10px] font-mono text-violet-300/50 whitespace-pre-wrap break-words leading-relaxed max-h-40 overflow-y-auto scrollbar-thin mt-1.5">
+                  {agent.thinkingContent}
+                </pre>
+              </details>
+            </div>
+          )}
+
+          {/* Tool timeline */}
+          {agent.toolCalls.length > 0 && (
+            <div className="px-3.5 py-2.5">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Wrench className="h-2.5 w-2.5 text-muted-foreground/70" />
+                <p className="text-[9px] uppercase tracking-widest font-semibold text-muted-foreground/70">
+                  Tool activity
+                </p>
+              </div>
+              <div className="space-y-1">
+                {agent.toolCalls.map((tc, idx) => (
+                  <SubAgentToolCard key={tc.id} tc={tc} index={idx} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Streamed text */}
+          {agent.content && (
+            <div className="px-3.5 py-2.5">
+              <p className="text-[9px] uppercase tracking-widest font-semibold text-muted-foreground/70 mb-1.5">Response</p>
+              <pre className="text-[11px] font-mono text-foreground/85 whitespace-pre-wrap break-words leading-relaxed max-h-64 overflow-y-auto scrollbar-thin">
+                {agent.content}
+              </pre>
+            </div>
+          )}
+
+          {/* Final result */}
+          {agent.result && (
+            <div className="px-3.5 py-2.5">
+              <p className="text-[9px] uppercase tracking-widest font-semibold text-muted-foreground/70 mb-1.5 flex items-center gap-1">
+                <CheckCircle2 className="h-2.5 w-2.5 text-success" />
+                Final result
+                {agent.tokensUsed !== undefined && (
+                  <span className="ml-2 text-muted-foreground/60 font-mono normal-case tracking-normal">
+                    {agent.tokensUsed.toLocaleString()} tok
+                  </span>
+                )}
+                {agent.durationMs !== undefined && (
+                  <span className="text-muted-foreground/60 font-mono normal-case tracking-normal">
+                    · {(agent.durationMs / 1000).toFixed(1)}s
+                  </span>
+                )}
+              </p>
+              <pre className="text-[10px] font-mono text-foreground/75 whitespace-pre-wrap break-all leading-relaxed max-h-72 overflow-y-auto scrollbar-thin bg-[hsl(var(--surface-2))] rounded-lg p-2.5">
+                {agent.result}
+              </pre>
+            </div>
+          )}
+
+          {/* Error */}
+          {agent.error && (
+            <div className="px-3.5 py-2.5 bg-red-500/[0.03]">
+              <p className="text-[9px] uppercase tracking-widest font-semibold text-red-400 mb-1.5">Error</p>
+              <p className="text-[11px] text-red-300/80 leading-relaxed whitespace-pre-wrap break-words font-mono">
+                {agent.error}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Compact tool card for the persistent sub-agent panel (post-stream).
+function SubAgentToolCard({ tc, index }: { tc: LocalToolCall; index: number }) {
+  const [open, setOpen] = useState(false)
+  const icon = TOOL_ICONS[tc.toolName] ?? '🔧'
+  const tone = tc.success === false
+    ? 'border-red-500/20 bg-red-500/[0.03]'
+    : 'border-emerald-500/15 bg-emerald-500/[0.02]'
+
+  return (
+    <div className={cn('rounded-lg border overflow-hidden text-[10px]', tone)}>
+      <button
+        type="button"
+        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:brightness-110 transition-all"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span className="text-[9px] font-mono text-muted-foreground/50 w-3 shrink-0 text-right">{index + 1}</span>
+        {tc.success === false
+          ? <XCircle className="h-2.5 w-2.5 text-red-400 shrink-0" />
+          : <CheckCircle2 className="h-2.5 w-2.5 text-emerald-400 shrink-0" />}
+        <span className="shrink-0 text-[10px]">{icon}</span>
+        <span className={cn(
+          'font-mono font-medium flex-1 truncate',
+          tc.success === false ? 'text-red-300' : 'text-emerald-300/90',
+        )}>
+          {tc.toolName}
+        </span>
+        {tc.durationMs !== undefined && (
+          <span className="text-[9px] text-muted-foreground/70 font-mono shrink-0">{tc.durationMs}ms</span>
+        )}
+        {open
+          ? <ChevronDown className="h-2.5 w-2.5 text-muted-foreground/70 shrink-0" />
+          : <ChevronRight className="h-2.5 w-2.5 text-muted-foreground/70 shrink-0" />}
       </button>
       {open && (
-        <div className="px-3.5 pb-3 border-t border-amber-500/10 pt-2.5">
-          <p className="text-[9px] uppercase tracking-widest font-semibold text-amber-700 mb-1.5">Task</p>
-          <p className="text-[11px] text-amber-300/70 leading-relaxed font-mono whitespace-pre-wrap break-words">
-            {agent.task}
-          </p>
+        <div className="border-t border-[hsl(var(--glass-border))] divide-y divide-[hsl(var(--glass-border))]">
+          <div className="px-2.5 py-2">
+            <p className="text-[8px] uppercase tracking-widest font-semibold text-muted-foreground/60 mb-1">Input</p>
+            <pre className="text-[10px] font-mono text-muted-foreground whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">
+              {JSON.stringify(tc.input, null, 2)}
+            </pre>
+          </div>
+          {tc.output !== undefined && (
+            <div className="px-2.5 py-2">
+              <p className="text-[8px] uppercase tracking-widest font-semibold text-muted-foreground/60 mb-1">Output</p>
+              <pre className="text-[10px] font-mono text-muted-foreground whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">
+                {String(tc.output)}
+              </pre>
+            </div>
+          )}
         </div>
       )}
     </div>

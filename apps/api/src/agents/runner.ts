@@ -10,13 +10,25 @@ import { globalSubAgentSemaphore } from './concurrency.js'
 import type { AgentContext, SandboxManager } from './types.js'
 
 // ── Event types emitted by the runner ─────────────────────────────────────────
+//
+// Top-level events (no `agentId`) come from the orchestrator/root agent.
+// Sub-agent events carry an `agentId` so the UI can route them to the right
+// sub-agent card. This lets the frontend render a Cursor-style nested
+// "sub-task" view where each spawned specialist has its own thinking +
+// tool timeline + final result, streamed live.
 
 export type AgentEvent =
-  | { type: 'thinking'; delta: string }      // Extended thinking block token
-  | { type: 'text_delta'; delta: string }    // Regular response text token (streamed)
+  | { type: 'thinking'; delta: string }      // Extended thinking block token (orchestrator)
+  | { type: 'text_delta'; delta: string }    // Regular response text token (orchestrator)
   | { type: 'tool_use'; toolName: string; toolUseId: string; input: unknown }
   | { type: 'tool_result'; toolUseId: string; toolName: string; success: boolean; output: string }
   | { type: 'sub_agent_spawned'; agentId: string; role: string; task: string }
+  // ── Sub-agent lifecycle (forwarded from runSubAgent generators) ──
+  | { type: 'sub_agent_thinking'; agentId: string; delta: string }
+  | { type: 'sub_agent_text_delta'; agentId: string; delta: string }
+  | { type: 'sub_agent_tool_use'; agentId: string; toolName: string; toolUseId: string; input: unknown }
+  | { type: 'sub_agent_tool_result'; agentId: string; toolUseId: string; toolName: string; success: boolean; output: string }
+  | { type: 'sub_agent_completed'; agentId: string; result: string; tokensUsed: number; success: boolean; error?: string }
   | { type: 'completed'; result: string; tokensUsed: number }
   | { type: 'error'; message: string }
 
@@ -240,21 +252,21 @@ export class AgentRunner {
         if (finalMessage.stop_reason === 'end_turn') break
         if (finalMessage.stop_reason !== 'tool_use') break
 
-        // ── Execute tool calls (in PARALLEL) ─────────────────────────────────
-        // Why parallel? When the model emits multiple tool_use blocks in a
-        // single assistant turn (e.g. several spawn_agent calls), we want them
-        // to run concurrently — not serially. The global SubAgentSemaphore
-        // (limit=5) still caps real parallelism for sub-agents; other tools
-        // (bash, log_grep…) run with no extra cap which is fine since they are
-        // short-lived sandbox calls.
+        // ── Execute tool calls (in PARALLEL, with sub-agent event forwarding) ──
+        // Two execution paths:
+        //   1) Regular tools (bash, log_*, read/write/list_file)
+        //        → tool.execute() returns a Promise<ToolResult>
+        //   2) spawn_agent
+        //        → runs a nested AgentRunner generator and forwards every
+        //          internal event (thinking, text_delta, tool_use, tool_result,
+        //          sub_agent_completed) up to OUR consumer so the UI can show
+        //          live sub-task activity.
         //
-        // Anthropic requires the `tool_result` array we feed back on the next
-        // turn to be in the SAME order as the assistant's tool_use blocks,
-        // and crucially to include EVERY tool_use id. We therefore pre-allocate
-        // a sparse array keyed by block index and write each finished result
-        // into its slot, regardless of completion order. The user-facing SSE
-        // `tool_result` events are emitted as each promise resolves, so the
-        // UI sees real-time parallelism.
+        // Both paths feed into the same Anthropic `tool_result` array (in
+        // ORIGINAL relative order) and the same SSE event stream (in
+        // COMPLETION order). The global SubAgentSemaphore (limit=5) is
+        // acquired inside runSubAgentStream — so even though we start all
+        // spawn_agent generators in parallel, only 5 actually run at a time.
         type ToolExecOutcome = {
           blockIndex: number
           toolUseId: string
@@ -265,12 +277,6 @@ export class AgentRunner {
           durationMs: number
         }
 
-        // `resultIndex` is the position within the tool_result array we'll
-        // feed back to Anthropic — strictly 0..(N-1) where N is the number
-        // of tool_use blocks (NOT the index inside assistantContentBlocks,
-        // which also contains text/thinking blocks). Anthropic only cares
-        // that tool_result blocks appear in the same RELATIVE order as the
-        // tool_use blocks, so this collapsed indexing is correct.
         const toolUseBlocks: Array<{
           index: number  // 0..(toolUseCount-1)
           block: Anthropic.ToolUseBlock
@@ -299,9 +305,16 @@ export class AgentRunner {
           }
         }
 
-        const runOne = async (
+        // Build a generator-per-slot, then race-drain them all in parallel.
+        // Each generator yields zero or more AgentEvents and finally produces
+        // a ToolExecOutcome (carried in the generator's return value).
+        //
+        // Regular tools yield nothing — only their final outcome is consumed
+        // via the generator's `return` value. spawn_agent yields a stream of
+        // sub_agent_* events plus the outcome.
+        const runRegularTool = async function* (
           slot: { index: number; block: Anthropic.ToolUseBlock },
-        ): Promise<ToolExecOutcome> => {
+        ): AsyncGenerator<AgentEvent, ToolExecOutcome, void> {
           const { block, index: blockIndex } = slot
           const toolInput = block.input as Record<string, unknown>
           const tool = getToolByName(block.name)
@@ -332,69 +345,168 @@ export class AgentRunner {
 
           const durationMs = Date.now() - startedAt
           return {
-            blockIndex,
-            toolUseId: block.id,
-            toolName: block.name,
+            blockIndex, toolUseId: block.id, toolName: block.name,
+            input: toolInput, output: toolOutput, success: toolSuccess, durationMs,
+          }
+        }
+
+        const self = this
+        const runSpawnAgentSlot = async function* (
+          slot: { index: number; block: Anthropic.ToolUseBlock },
+        ): AsyncGenerator<AgentEvent, ToolExecOutcome, void> {
+          const { block, index: blockIndex } = slot
+          const toolInput = block.input as Record<string, unknown>
+          const startedAt = Date.now()
+
+          // Orchestrator-only guard mirrors spawnAgentTool's runtime check
+          if (!ctx.isOrchestrator) {
+            return {
+              blockIndex, toolUseId: block.id, toolName: block.name,
+              input: toolInput, output: 'spawn_agent is restricted to the orchestrator agent.',
+              success: false, durationMs: Date.now() - startedAt,
+            }
+          }
+
+          // Validate inputs with the same schema spawnAgentTool uses
+          const { spawnAgentTool } = await import('./tools/spawn-agent.js')
+          const parsed = spawnAgentTool.inputSchema.safeParse(toolInput)
+          if (!parsed.success) {
+            return {
+              blockIndex, toolUseId: block.id, toolName: block.name,
+              input: toolInput, output: `Invalid input: ${parsed.error.message}`,
+              success: false, durationMs: Date.now() - startedAt,
+            }
+          }
+
+          const subAgentId = randomUUID()
+
+          // Announce the spawn BEFORE acquiring the semaphore so the UI shows
+          // a "queued/starting" card immediately even if all slots are busy.
+          yield {
+            type: 'sub_agent_spawned',
+            agentId: subAgentId,
+            role: parsed.data.role,
+            task: parsed.data.task,
+          }
+
+          let subResult: SubAgentResult | undefined
+          try {
+            const subGen = self.runSubAgentStream(
+              {
+                parentRunId: ctx.agentId,
+                sessionId: ctx.sessionId,
+                role: parsed.data.role,
+                task: parsed.data.task,
+                inputFiles: parsed.data.inputFiles,
+                outputSchema: parsed.data.outputSchema,
+                db: ctx.db,
+                sandbox: ctx.sandbox,
+              },
+              subAgentId,
+            )
+
+            // Drain the sub-agent generator, forwarding every event upstream.
+            // The terminal value (SubAgentResult) is delivered via gen.return.
+            while (true) {
+              const next = await subGen.next()
+              if (next.done) {
+                subResult = next.value as SubAgentResult
+                break
+              }
+              yield next.value
+            }
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err)
+            return {
+              blockIndex, toolUseId: block.id, toolName: block.name,
+              input: toolInput, output: `Sub-agent failed: ${message}`,
+              success: false, durationMs: Date.now() - startedAt,
+            }
+          }
+
+          const durationMs = Date.now() - startedAt
+          const output = subResult
+            ? JSON.stringify(subResult.data, null, 2)
+            : ''
+          return {
+            blockIndex, toolUseId: block.id, toolName: block.name,
             input: toolInput,
-            output: toolOutput,
-            success: toolSuccess,
+            output,
+            success: subResult?.success ?? false,
             durationMs,
           }
         }
 
-        // Fire all tool executions in parallel. We use a Set of "live"
-        // promises and rebuild it as each one settles, so Promise.race
-        // never observes the same resolved promise twice. This is the
-        // canonical pattern for streaming completion-order results in JS.
-        type Tagged = { outcome: ToolExecOutcome; promise: Promise<Tagged> }
-        const live = new Set<Promise<Tagged>>()
-        for (const slot of toolUseBlocks) {
-          // Self-referential tag so we can find this promise in the Set
-          // after it resolves (`winner.promise` === the promise in `live`).
-          const promise: Promise<Tagged> = runOne(slot).then((outcome) => ({
-            outcome,
-            promise,
-          }))
-          live.add(promise)
+        const buildSlotGen = (slot: { index: number; block: Anthropic.ToolUseBlock }) =>
+          slot.block.name === 'spawn_agent' ? runSpawnAgentSlot(slot) : runRegularTool(slot)
+
+        // Each slot becomes a "live driver" that pumps its generator and,
+        // when done, resolves with its final ToolExecOutcome.
+        type Driver = {
+          slotId: number
+          nextPromise: Promise<{ slotId: number; ev: IteratorResult<AgentEvent, ToolExecOutcome> }>
+          gen: AsyncGenerator<AgentEvent, ToolExecOutcome, void>
         }
 
-        while (live.size > 0) {
+        const drivers: Map<number, Driver> = new Map()
+        toolUseBlocks.forEach((slot, slotId) => {
+          const gen = buildSlotGen(slot)
+          drivers.set(slotId, {
+            slotId,
+            gen,
+            nextPromise: gen.next().then((ev) => ({ slotId, ev })),
+          })
+        })
+
+        // Race-drain across all live drivers. Whenever a driver yields an
+        // event we forward it; when it completes (`ev.done`) we record the
+        // outcome and remove it from the live set.
+        while (drivers.size > 0) {
           if (signal?.aborted) break
 
-          const winner = await Promise.race(live)
-          live.delete(winner.promise)
-
-          const { outcome } = winner
-
-          // Yield tool_result event for the UI — this happens AS each tool
-          // finishes, so the user sees real-time parallel completion.
-          yield {
-            type: 'tool_result',
-            toolUseId: outcome.toolUseId,
-            toolName: outcome.toolName,
-            success: outcome.success,
-            output: outcome.output,
-          }
-
-          // Buffer DB insert
-          dbInserts.push(
-            db.insert(toolCalls).values({
-              id: randomUUID(),
-              agentRunId,
-              toolName: outcome.toolName,
-              input: outcome.input,
-              output: { success: outcome.success, output: outcome.output },
-              durationMs: outcome.durationMs,
-            }),
+          const winner = await Promise.race(
+            Array.from(drivers.values()).map((d) => d.nextPromise),
           )
+          const driver = drivers.get(winner.slotId)
+          if (!driver) continue  // already removed
 
-          // Place tool_result block at its ORIGINAL position in the array
-          // — Anthropic requires order-preserved tool_result for the next turn.
-          toolResultContent[outcome.blockIndex] = {
-            type: 'tool_result',
-            tool_use_id: outcome.toolUseId,
-            content: outcome.output,
-            is_error: !outcome.success,
+          if (winner.ev.done) {
+            const outcome = winner.ev.value
+
+            yield {
+              type: 'tool_result',
+              toolUseId: outcome.toolUseId,
+              toolName: outcome.toolName,
+              success: outcome.success,
+              output: outcome.output,
+            }
+
+            dbInserts.push(
+              db.insert(toolCalls).values({
+                id: randomUUID(),
+                agentRunId,
+                toolName: outcome.toolName,
+                input: outcome.input,
+                output: { success: outcome.success, output: outcome.output },
+                durationMs: outcome.durationMs,
+              }),
+            )
+
+            toolResultContent[outcome.blockIndex] = {
+              type: 'tool_result',
+              tool_use_id: outcome.toolUseId,
+              content: outcome.output,
+              is_error: !outcome.success,
+            }
+
+            drivers.delete(winner.slotId)
+          } else {
+            // Forward the streamed sub-event (only spawn_agent generators
+            // produce these; regular tool generators don't yield anything).
+            yield winner.ev.value
+
+            // Queue the driver's next pump
+            driver.nextPromise = driver.gen.next().then((ev) => ({ slotId: winner.slotId, ev }))
           }
         }
 
@@ -429,10 +541,20 @@ export class AgentRunner {
     }
   }
 
-  // ── Sub-agent entry point (called from spawn_agent tool) ─────────────────────
-
-  async runSubAgent(options: SubAgentRunOptions): Promise<SubAgentResult> {
-    const agentId = randomUUID()
+  // ── Sub-agent streaming entry point ─────────────────────────────────────────
+  //
+  // Unlike the old Promise-returning version, this is an async generator so
+  // that the PARENT runner can forward every internal event (thinking,
+  // text_delta, tool_use, tool_result) to the SSE stream — letting the UI
+  // render a live "sub-task" view per spawned specialist.
+  //
+  // The final SubAgentResult is delivered via the generator's `return` value,
+  // accessible to the caller as the `value` field of the final iteration
+  // result when `done` is true.
+  async *runSubAgentStream(
+    options: SubAgentRunOptions,
+    agentId: string,
+  ): AsyncGenerator<AgentEvent, SubAgentResult, void> {
     const { sessionId, parentRunId, role, task, inputFiles, sandbox } = options
 
     // Single semaphore point: only globalSubAgentSemaphore, not spawn-agent's local one
@@ -451,6 +573,19 @@ export class AgentRunner {
         tokensUsed: 0,
       })
 
+      // Make sure the sub-agent's sandbox user + workdir exist BEFORE its
+      // tools start firing. Without this, log_grep/log_stats/read_file all
+      // fail with "no such file or directory" because the workdir's `output/`
+      // hasn't been created yet (only the orchestrator's workdir is pre-made
+      // in routes/chat.ts).
+      try {
+        await sandbox.ensureAgentUser(sessionId, agentId)
+        const workdir = sandbox.agentWorkdir(sessionId, agentId)
+        await sandbox.exec(`mkdir -p ${JSON.stringify(workdir + '/output')}`)
+      } catch {
+        // Non-fatal: tools will surface the real error if dirs are missing
+      }
+
       let finalResult = ''
       let totalTokens = 0
       let success = true
@@ -467,12 +602,53 @@ export class AgentRunner {
       })
 
       for await (const event of gen) {
-        if (event.type === 'completed') {
-          finalResult = event.result
-          totalTokens = event.tokensUsed
-        } else if (event.type === 'error') {
-          success = false
-          errorMsg = event.message
+        // Forward every internal event up to the parent, but RETAG it so the
+        // frontend can route it to the correct sub-agent card.
+        switch (event.type) {
+          case 'thinking':
+            yield { type: 'sub_agent_thinking', agentId, delta: event.delta }
+            break
+          case 'text_delta':
+            yield { type: 'sub_agent_text_delta', agentId, delta: event.delta }
+            break
+          case 'tool_use':
+            yield {
+              type: 'sub_agent_tool_use',
+              agentId,
+              toolName: event.toolName,
+              toolUseId: event.toolUseId,
+              input: event.input,
+            }
+            break
+          case 'tool_result':
+            yield {
+              type: 'sub_agent_tool_result',
+              agentId,
+              toolUseId: event.toolUseId,
+              toolName: event.toolName,
+              success: event.success,
+              output: event.output,
+            }
+            break
+          case 'completed':
+            finalResult = event.result
+            totalTokens = event.tokensUsed
+            break
+          case 'error':
+            success = false
+            errorMsg = event.message
+            break
+          // Nested sub-agents would propagate up here too, but specialists
+          // can't call spawn_agent so this is currently dead code — we leave
+          // the pass-through in case that policy ever changes.
+          case 'sub_agent_spawned':
+          case 'sub_agent_thinking':
+          case 'sub_agent_text_delta':
+          case 'sub_agent_tool_use':
+          case 'sub_agent_tool_result':
+          case 'sub_agent_completed':
+            yield event
+            break
         }
       }
 
@@ -486,6 +662,18 @@ export class AgentRunner {
         }
       } catch {
         // Not JSON — return raw text
+      }
+
+      // Emit a terminal sub_agent_completed event so the UI can flip the
+      // card from "running" to "done" before the parent's own tool_result
+      // event arrives. Both events carry the same agentId.
+      yield {
+        type: 'sub_agent_completed',
+        agentId,
+        result: finalResult,
+        tokensUsed: totalTokens,
+        success,
+        error: errorMsg,
       }
 
       return { success, agentId, data: parsedData, error: errorMsg, tokensUsed: totalTokens }

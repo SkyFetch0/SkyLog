@@ -38,7 +38,11 @@ export function useSendMessage({ sessionId, onEvent, onDone }: UseSendMessageOpt
             if (event.type === 'completed') {
               contentRef.current = event.message
             }
-            if (event.type === 'sub_agent_spawned') {
+            // Refresh the AgentPanel (sidebar tree) whenever a sub-agent's
+            // lifecycle changes server-side. Tool events fire too often to
+            // invalidate on each one — completed is enough to catch token
+            // counts + final status; spawned ensures the new node appears.
+            if (event.type === 'sub_agent_spawned' || event.type === 'sub_agent_completed') {
               qc.invalidateQueries({ queryKey: ['agent-runs', sessionId] })
             }
             onEvent(event)

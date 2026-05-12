@@ -96,6 +96,19 @@ export type SseEvent =
   | { type: 'tool_use'; tool: string; toolUseId: string; input: unknown }
   | { type: 'tool_result'; toolUseId: string; tool: string; success: boolean; output: string }
   | { type: 'sub_agent_spawned'; agentId: string; role: string; task: string }
+  // ── Sub-agent live activity (Cursor-style nested sub-task view) ──
+  | { type: 'sub_agent_thinking'; agentId: string; content: string }
+  | { type: 'sub_agent_text_delta'; agentId: string; content: string }
+  | { type: 'sub_agent_tool_use'; agentId: string; tool: string; toolUseId: string; input: unknown }
+  | { type: 'sub_agent_tool_result'; agentId: string; toolUseId: string; tool: string; success: boolean; output: string }
+  | {
+      type: 'sub_agent_completed'
+      agentId: string
+      result: string
+      tokensUsed: number
+      success: boolean
+      error?: string
+    }
   | { type: 'completed'; message: string; tokensUsed: number; messageId?: string }
   | { type: 'error'; message: string }
   | { type: 'done' }

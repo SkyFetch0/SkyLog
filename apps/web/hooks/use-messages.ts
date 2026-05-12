@@ -21,6 +21,15 @@ export interface LocalSubAgent {
   role: string
   task: string
   spawnedAt: number
+  // ── Live activity (filled as sub_agent_* events arrive) ──
+  status: 'running' | 'completed' | 'failed'
+  thinkingContent: string
+  content: string                         // streamed text response from the sub-agent
+  toolCalls: LocalToolCall[]              // sub-agent's own tool timeline
+  result?: string                         // final JSON/text result (after sub_agent_completed)
+  tokensUsed?: number
+  durationMs?: number
+  error?: string
 }
 
 export interface StreamingMessage {
@@ -153,8 +162,97 @@ export function useMessages(initialMessages: Message[]) {
                 role: event.role,
                 task: event.task,
                 spawnedAt: Date.now(),
+                status: 'running',
+                thinkingContent: '',
+                content: '',
+                toolCalls: [],
               },
             ],
+          }
+
+        // ── Sub-agent live activity ───────────────────────────────────────
+        case 'sub_agent_thinking':
+          return {
+            ...prev,
+            subAgents: prev.subAgents.map((s) =>
+              s.agentId === event.agentId
+                ? { ...s, thinkingContent: s.thinkingContent + event.content }
+                : s,
+            ),
+          }
+
+        case 'sub_agent_text_delta':
+          return {
+            ...prev,
+            subAgents: prev.subAgents.map((s) =>
+              s.agentId === event.agentId
+                ? { ...s, content: s.content + event.content }
+                : s,
+            ),
+          }
+
+        case 'sub_agent_tool_use':
+          return {
+            ...prev,
+            subAgents: prev.subAgents.map((s) =>
+              s.agentId === event.agentId
+                ? {
+                    ...s,
+                    toolCalls: [
+                      ...s.toolCalls,
+                      {
+                        id: crypto.randomUUID(),
+                        toolName: event.tool,
+                        toolUseId: event.toolUseId,
+                        input: event.input,
+                        pending: true,
+                        startedAt: Date.now(),
+                      },
+                    ],
+                  }
+                : s,
+            ),
+          }
+
+        case 'sub_agent_tool_result': {
+          const now = Date.now()
+          return {
+            ...prev,
+            subAgents: prev.subAgents.map((s) => {
+              if (s.agentId !== event.agentId) return s
+              return {
+                ...s,
+                toolCalls: s.toolCalls.map((tc) =>
+                  tc.toolUseId === event.toolUseId
+                    ? {
+                        ...tc,
+                        output: event.output,
+                        success: event.success,
+                        pending: false,
+                        durationMs: now - tc.startedAt,
+                      }
+                    : tc,
+                ),
+              }
+            }),
+          }
+        }
+
+        case 'sub_agent_completed':
+          return {
+            ...prev,
+            subAgents: prev.subAgents.map((s) =>
+              s.agentId === event.agentId
+                ? {
+                    ...s,
+                    status: event.success ? 'completed' : 'failed',
+                    result: event.result,
+                    tokensUsed: event.tokensUsed,
+                    durationMs: Date.now() - s.spawnedAt,
+                    error: event.error,
+                  }
+                : s,
+            ),
           }
 
         case 'completed':

@@ -1,8 +1,17 @@
 import { z } from 'zod'
 import type { AgentTool, AgentContext, ToolResult } from '../types.js'
 
-// Semaphore lives solely in concurrency.ts / runner.ts.
-// This tool no longer has its own semaphore to avoid double-throttle / deadlock.
+// spawn_agent is special: the orchestrator runner detects this tool name
+// and handles it via runSubAgentStream() so it can FORWARD every internal
+// sub-agent event (thinking / text_delta / tool_use / tool_result) up to
+// the SSE stream for live UI rendering.
+//
+// The execute() implementation below is therefore a fallback — it should
+// never be hit in normal operation. We keep the schema/description because
+// Anthropic still needs the tool definition in its tools list. If the
+// fallback ever fires it means the runner's special-case branch missed
+// this block (programmer bug), so we return a loud error instead of
+// silently degrading to the old non-streaming path.
 
 const inputSchema = z.object({
   role: z
@@ -38,45 +47,16 @@ export const spawnAgentTool: AgentTool<Input> = {
 
   inputSchema,
 
-  async execute(input: Input, ctx: AgentContext): Promise<ToolResult> {
-    if (!ctx.isOrchestrator) {
-      return {
-        success: false,
-        output: '',
-        error: 'spawn_agent is restricted to the orchestrator agent.',
-      }
-    }
-
-    try {
-      // Dynamic import to break circular dependency at module load time.
-      // Concurrency is controlled exclusively by globalSubAgentSemaphore inside runSubAgent().
-      const { AgentRunner } = await import('../runner.js')
-
-      const runner = new AgentRunner()
-      const result = await runner.runSubAgent({
-        parentRunId: ctx.agentId,
-        sessionId: ctx.sessionId,
-        role: input.role,
-        task: input.task,
-        inputFiles: input.inputFiles,
-        outputSchema: input.outputSchema,
-        db: ctx.db,
-        sandbox: ctx.sandbox,
-      })
-
-      return {
-        success: result.success,
-        output: JSON.stringify(result.data, null, 2),
-        error: result.error,
-        metadata: {
-          subAgentId: result.agentId,
-          role: input.role,
-          tokensUsed: result.tokensUsed,
-        },
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      return { success: false, output: '', error: `Sub-agent failed: ${message}` }
+  async execute(_input: Input, _ctx: AgentContext): Promise<ToolResult> {
+    // This path should be unreachable — runner.ts handles spawn_agent in its
+    // own special branch so it can stream sub-agent events live. If we ever
+    // land here, the runner's dispatching logic is broken.
+    return {
+      success: false,
+      output: '',
+      error:
+        'spawn_agent must be dispatched by the runner, not executed via the normal tool path. ' +
+        'This is a bug — please report it.',
     }
   },
 }
