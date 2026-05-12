@@ -57,7 +57,7 @@ export function UsersTab() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by email…"
+          placeholder="Search by emailâ€¦"
           className={cn(
             'w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-[hsl(var(--glass-bg))] border text-sm',
             'text-foreground placeholder:text-muted-foreground/60',
@@ -130,7 +130,7 @@ function UserRow({
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
-  // Escape ile menüyü kapat
+  // Escape ile meny kapat
   useEffect(() => {
     if (!menuOpen) return
     const handler = (e: KeyboardEvent) => {
@@ -227,7 +227,7 @@ function UserRow({
               )}
             </>
           ) : (
-            <span className="text-[10px] text-muted-foreground/60">—</span>
+            <span className="text-[10px] text-muted-foreground/60">â€”</span>
           )}
         </div>
       </td>
