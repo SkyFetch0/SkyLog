@@ -8,118 +8,62 @@
  * ═══════════════════════════════════════════════════════════════════════════════
  *
  *  Theme palettes are selected by the `data-theme` attribute on <html>:
- *      <html data-theme="dark">   ← default
- *      <html data-theme="light">  ← (future)
- *      <html data-theme="purple"> ← (future)
- *
- *  Semantic tokens (surface / elevated / border / accent) decouple components
- *  from raw color values so adding a new palette is ~30 lines of CSS.
+ *      <html data-theme="light">   ← default
+ *      <html data-theme="dark">
+ *      <html data-theme="purple">
+ *      <html data-theme="ocean">
  *
  *  All values are HSL triplets (no hsl() wrapper) so Tailwind's
  *  `bg-background`, `text-foreground`, etc. can compose with /<alpha>.
+ *
+ *  Glass tokens differ between light (subtle dark tint over white surfaces)
+ *  and dark/colored (white tint over dark surfaces) — handled per palette.
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
 @layer base {
-  /* ─── Default palette: DARK ──────────────────────────────────────────────── */
+  /* ─── Default palette: LIGHT ─────────────────────────────────────────────── */
   :root,
-  [data-theme="dark"] {
+  [data-theme="light"] {
     /* Base canvas */
-    --background: 222 47% 4%;
-    --foreground: 210 40% 96%;
+    --background: 210 30% 99%;          /* slightly off-white for chrome contrast */
+    --foreground: 222 47% 11%;
 
-    /* Surface elevations (chat balon, kart, input vb.) */
-    --surface-1: 222 40% 6%;          /* en koyu kart */
-    --surface-2: 222 36% 9%;          /* hover / elevated */
-    --surface-3: 222 32% 12%;         /* en üst eleve */
+    /* Surface elevations (cards, balon, popovers) */
+    --surface-1: 0 0% 100%;             /* card / message balloon — pure white */
+    --surface-2: 215 28% 96%;           /* hover / soft elevated */
+    --surface-3: 215 28% 92%;           /* highest elevation (menus, dropdowns) */
 
     /* Sidebar / app shell */
-    --sidebar-background: 222 50% 3%;
-    --sidebar-foreground: 215 20% 65%;
-    --sidebar-border: 217 32% 9%;
-    --sidebar-accent: 217 32% 8%;
-    --sidebar-accent-foreground: 210 40% 98%;
-
-    /* Cards & popovers (shadcn uyumu) */
-    --card: 222 40% 7%;
-    --card-foreground: 210 40% 96%;
-    --popover: 222 38% 8%;
-    --popover-foreground: 210 40% 96%;
-
-    /* Brand */
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
-    --primary-soft: 217 91% 60% / 0.12;
-    --primary-glow: 217 91% 60% / 0.35;
-
-    /* Accent (sub-agent, highlight) */
-    --accent: 217 28% 14%;
-    --accent-foreground: 210 40% 96%;
-
-    /* Secondary / muted */
-    --secondary: 217 28% 12%;
-    --secondary-foreground: 210 40% 96%;
-    --muted: 217 28% 11%;
-    --muted-foreground: 215 18% 55%;
-
-    /* Status renkleri */
-    --destructive: 0 72% 55%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 55%;
-    --warning-foreground: 222 47% 8%;
-    --info: 199 89% 55%;
-
-    /* Borders / lines */
-    --border: 217 28% 13%;
-    --border-strong: 217 28% 18%;
-    --input: 217 28% 14%;
-    --ring: 217 91% 60%;
-
-    /* Glass / overlay */
-    --glass-bg: 0 0% 100% / 0.04;
-    --glass-border: 0 0% 100% / 0.08;
-    --glass-bg-strong: 0 0% 100% / 0.06;
-
-    /* Radius */
-    --radius: 0.875rem;
-    --radius-sm: 0.5rem;
-    --radius-lg: 1.25rem;
-  }
-
-  /* ─── Light palette ──────────────────────────────────────────────────────── */
-  [data-theme="light"] {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 8%;
-
-    --surface-1: 215 28% 97%;
-    --surface-2: 215 28% 94%;
-    --surface-3: 215 28% 90%;
-
-    --sidebar-background: 215 28% 97%;
-    --sidebar-foreground: 222 30% 30%;
+    --sidebar-background: 215 30% 97%;
+    --sidebar-foreground: 222 25% 30%;
     --sidebar-border: 215 28% 88%;
-    --sidebar-accent: 215 28% 92%;
+    --sidebar-accent: 215 30% 93%;
     --sidebar-accent-foreground: 222 47% 12%;
 
+    /* Cards & popovers (shadcn) */
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 8%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 8%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 217 91% 55%;
+    /* Brand */
+    --primary: 217 91% 52%;
     --primary-foreground: 0 0% 100%;
-    --primary-soft: 217 91% 55% / 0.10;
-    --primary-glow: 217 91% 55% / 0.30;
+    --primary-soft: 217 91% 52% / 0.10;
+    --primary-glow: 217 91% 52% / 0.30;
 
-    --accent: 215 28% 92%;
-    --accent-foreground: 222 47% 8%;
-    --secondary: 215 28% 94%;
-    --secondary-foreground: 222 47% 8%;
-    --muted: 215 28% 94%;
-    --muted-foreground: 215 16% 40%;
+    /* Accent */
+    --accent: 215 28% 93%;
+    --accent-foreground: 222 47% 11%;
 
+    /* Secondary / muted */
+    --secondary: 215 28% 95%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 215 28% 95%;
+    --muted-foreground: 215 16% 38%;
+
+    /* Status renkleri */
     --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 71% 38%;
@@ -128,17 +72,73 @@
     --warning-foreground: 0 0% 100%;
     --info: 199 89% 48%;
 
-    --border: 215 28% 88%;
-    --border-strong: 215 28% 80%;
-    --input: 215 28% 92%;
-    --ring: 217 91% 55%;
+    /* Borders / lines */
+    --border: 215 25% 88%;
+    --border-strong: 215 22% 78%;
+    --input: 215 25% 92%;
+    --ring: 217 91% 52%;
 
-    --glass-bg: 222 47% 8% / 0.04;
-    --glass-border: 222 47% 8% / 0.08;
-    --glass-bg-strong: 222 47% 8% / 0.06;
+    /* Glass / overlay (light: dark tint over white) */
+    --glass-bg: 222 47% 11% / 0.035;
+    --glass-border: 222 47% 11% / 0.08;
+    --glass-bg-strong: 222 47% 11% / 0.05;
+
+    /* Radius */
+    --radius: 0.875rem;
+    --radius-sm: 0.5rem;
+    --radius-lg: 1.25rem;
   }
 
-  [data-theme="light"] html { color-scheme: light; }
+  /* ─── Dark palette ───────────────────────────────────────────────────────── */
+  [data-theme="dark"] {
+    --background: 222 47% 4%;
+    --foreground: 210 40% 96%;
+
+    --surface-1: 222 40% 6%;
+    --surface-2: 222 36% 9%;
+    --surface-3: 222 32% 12%;
+
+    --sidebar-background: 222 50% 3%;
+    --sidebar-foreground: 215 20% 65%;
+    --sidebar-border: 217 32% 9%;
+    --sidebar-accent: 217 32% 8%;
+    --sidebar-accent-foreground: 210 40% 98%;
+
+    --card: 222 40% 7%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 38% 8%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 217 91% 60% / 0.12;
+    --primary-glow: 217 91% 60% / 0.35;
+
+    --accent: 217 28% 14%;
+    --accent-foreground: 210 40% 96%;
+    --secondary: 217 28% 12%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 28% 11%;
+    --muted-foreground: 215 18% 55%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 222 47% 8%;
+    --info: 199 89% 55%;
+
+    --border: 217 28% 13%;
+    --border-strong: 217 28% 18%;
+    --input: 217 28% 14%;
+    --ring: 217 91% 60%;
+
+    /* Glass / overlay (dark: light tint over dark) */
+    --glass-bg: 0 0% 100% / 0.04;
+    --glass-border: 0 0% 100% / 0.08;
+    --glass-bg-strong: 0 0% 100% / 0.06;
+  }
 
   /* ─── Purple palette ─────────────────────────────────────────────────────── */
   [data-theme="purple"] {
@@ -247,9 +247,16 @@
   }
 
   html {
-    color-scheme: dark;
+    color-scheme: light;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Dark/colored palettes need dark color-scheme for native form controls */
+  html[data-theme="dark"],
+  html[data-theme="purple"],
+  html[data-theme="ocean"] {
+    color-scheme: dark;
   }
 
   body {
@@ -276,7 +283,7 @@
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+  background: hsl(var(--muted-foreground) / 0.6);
 }
 
 /* ─── Animations ────────────────────────────────────────────────────────────── */
@@ -337,7 +344,7 @@
   background-image: linear-gradient(
     135deg,
     hsl(var(--primary)) 0%,
-    hsl(199 89% 55%) 100%
+    hsl(199 89% 48%) 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -350,13 +357,13 @@
 }
 .hover-lift:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 32px -12px hsl(var(--primary) / 0.25);
+  box-shadow: 0 12px 32px -16px hsl(var(--primary) / 0.30);
 }
 
 /* Auth sayfası arka plan glow'u */
 .auth-bg {
   background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, hsl(var(--primary) / 0.15), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 60%, hsl(199 89% 55% / 0.08), transparent),
+    radial-gradient(ellipse 80% 50% at 50% -10%, hsl(var(--primary) / 0.18), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 60%, hsl(199 89% 55% / 0.10), transparent),
     hsl(var(--background));
 }

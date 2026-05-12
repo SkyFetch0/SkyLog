@@ -36,7 +36,7 @@ export function AgentPanel({ sessionId, hasActiveRun }: Props) {
   return (
     <aside className="w-[300px] shrink-0 flex flex-col border-l border-[hsl(var(--glass-border))] bg-sidebar">
       {/* Header */}
-      <div className="flex items-center justify-between h-14 px-4 border-b border-[hsl(var(--glass-border))]">
+      <div className="flex items-center justify-between h-16 px-4 border-b border-[hsl(var(--glass-border))]">
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center">
             <Cpu className="h-3 w-3 text-primary" />
@@ -53,7 +53,7 @@ export function AgentPanel({ sessionId, hasActiveRun }: Props) {
         <div className="flex items-center gap-1">
           <button
             onClick={() => qc.invalidateQueries({ queryKey: ['agent-runs', sessionId] })}
-            className="p-1.5 rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-[hsl(0_0%_100%/0.04)] transition-all"
+            className="p-1.5 rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-[hsl(var(--glass-bg))] transition-all"
             title="Refresh"
             aria-label="Refresh agent runs"
           >
@@ -61,7 +61,7 @@ export function AgentPanel({ sessionId, hasActiveRun }: Props) {
           </button>
           <button
             onClick={() => setCollapsed(true)}
-            className="p-1.5 rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-[hsl(0_0%_100%/0.04)] transition-all"
+            className="p-1.5 rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-[hsl(var(--glass-bg))] transition-all"
             title="Collapse panel"
             aria-label="Collapse panel"
           >
@@ -79,7 +79,7 @@ export function AgentPanel({ sessionId, hasActiveRun }: Props) {
           )}
           {!isLoading && runs.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-              <div className="w-10 h-10 rounded-xl bg-[hsl(0_0%_100%/0.03)] border border-[hsl(var(--glass-border))] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-[hsl(var(--glass-bg))] border border-[hsl(var(--glass-border))] flex items-center justify-center">
                 <Cpu className="h-4 w-4 text-muted-foreground/60" />
               </div>
               <p className="text-xs text-muted-foreground/80 max-w-[160px] leading-relaxed">
@@ -117,11 +117,11 @@ function AgentRunNode({ run, depth }: { run: AgentRun; depth: number }) {
     <div className={cn(
       'rounded-xl overflow-hidden border transition-all',
       isOrchestrator
-        ? 'border-[hsl(0_0%_100%/0.08)] bg-[hsl(0_0%_100%/0.03)]'
-        : 'ml-3 border-[hsl(var(--glass-border))] bg-[hsl(0_0%_100%/0.02)]',
+        ? 'border-[hsl(var(--glass-border))] bg-[hsl(var(--glass-bg))]'
+        : 'ml-3 border-[hsl(var(--glass-border))] bg-[hsl(var(--glass-bg))]',
     )}>
       <button
-        className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-[hsl(0_0%_100%/0.03)] transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-[hsl(var(--glass-bg))] transition-colors"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-label={`${expanded ? 'Collapse' : 'Expand'} agent: ${run.role}`}

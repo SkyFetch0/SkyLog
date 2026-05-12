@@ -328,7 +328,7 @@ export function StreamingMessage({ msg }: { msg: StreamingMsg }) {
 
         {/* Final answer */}
         {hasContent && (
-          <div className="rounded-2xl rounded-tl-sm bg-[hsl(0_0%_100%/0.04)] border border-[hsl(var(--glass-border))] px-4 py-3.5 text-sm text-foreground/90 shadow-[0_2px_12px_-6px_hsl(0_0%_0%/0.4)]">
+          <div className="rounded-2xl rounded-tl-sm bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] px-4 py-3.5 text-sm text-foreground/90 shadow-[0_2px_12px_-6px_hsl(var(--foreground)/0.12)]">
             <MarkdownContent content={msg.content} />
             {isActive && <span className="cursor-blink" />}
           </div>

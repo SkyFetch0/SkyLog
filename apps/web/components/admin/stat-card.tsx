@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import type { ComponentType, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
@@ -17,7 +17,7 @@ const ACCENT_CLASSES: Record<NonNullable<Props['accent']>, string> = {
   success:     'text-success bg-success/10 border-success/20',
   warning:     'text-warning bg-warning/10 border-warning/20',
   destructive: 'text-destructive bg-destructive/10 border-destructive/20',
-  muted:       'text-muted-foreground bg-[hsl(0_0%_100%/0.05)] border-[hsl(var(--glass-border))]',
+  muted:       'text-muted-foreground bg-[hsl(var(--glass-bg-strong))] border-[hsl(var(--glass-border))]',
 }
 
 export function StatCard({ label, value, icon: Icon, trend, accent = 'primary', className }: Props) {

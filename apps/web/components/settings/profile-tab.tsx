@@ -58,10 +58,10 @@ export function ProfileTab() {
 
   const inputCls = (hasError?: boolean) =>
     cn(
-      'w-full px-3.5 py-2.5 rounded-xl bg-[hsl(0_0%_100%/0.04)] border text-sm',
+      'w-full px-3.5 py-2.5 rounded-xl bg-[hsl(var(--glass-bg))] border text-sm',
       'text-foreground placeholder:text-muted-foreground/60',
       'focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary/50 transition-all',
-      hasError ? 'border-destructive/50' : 'border-[hsl(0_0%_100%/0.08)]',
+      hasError ? 'border-destructive/50' : 'border-[hsl(var(--glass-border))]',
     )
 
   return (
@@ -69,7 +69,7 @@ export function ProfileTab() {
       {/* ── Account Info ─────────────────────────────────────────── */}
       <SectionCard title="Account Information" description="Your registered email and account creation date.">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-[hsl(0_0%_100%/0.03)] border border-[hsl(0_0%_100%/0.06)]">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-[hsl(var(--glass-bg))] border border-[hsl(var(--glass-bg-strong))]">
             <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
               <Mail className="h-3.5 w-3.5 text-primary" />
             </div>
@@ -79,7 +79,7 @@ export function ProfileTab() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-[hsl(0_0%_100%/0.03)] border border-[hsl(0_0%_100%/0.06)]">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-[hsl(var(--glass-bg))] border border-[hsl(var(--glass-bg-strong))]">
             <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
               <Calendar className="h-3.5 w-3.5 text-primary" />
             </div>

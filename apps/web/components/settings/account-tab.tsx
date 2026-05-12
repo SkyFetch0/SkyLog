@@ -45,10 +45,10 @@ export function AccountTab() {
 
   const inputCls = (hasError?: boolean) =>
     cn(
-      'w-full px-3.5 py-2.5 rounded-xl bg-[hsl(0_0%_100%/0.04)] border text-sm',
+      'w-full px-3.5 py-2.5 rounded-xl bg-[hsl(var(--glass-bg))] border text-sm',
       'text-foreground placeholder:text-muted-foreground/60',
       'focus:outline-none focus:ring-1 focus:ring-destructive focus:border-destructive/50 transition-all',
-      hasError ? 'border-destructive/50' : 'border-[hsl(0_0%_100%/0.08)]',
+      hasError ? 'border-destructive/50' : 'border-[hsl(var(--glass-border))]',
     )
 
   return (

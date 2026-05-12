@@ -9,20 +9,20 @@ export default function ChatHomePage() {
       </div>
 
       <div className="relative z-10 flex flex-col items-center gap-7 max-w-md text-center">
-        <div className="relative w-20 h-20 flex items-center justify-center">
-          <div className="absolute inset-0 rounded-full bg-primary/10 blur-2xl" aria-hidden />
+        <div className="relative w-28 h-28 flex items-center justify-center">
+          <div className="absolute inset-0 rounded-full bg-primary/15 blur-3xl" aria-hidden />
           <Image
             src="/images/SkyLogo.png"
             alt="SkyLog"
-            width={80}
-            height={80}
-            className="relative object-contain drop-shadow-[0_0_24px_hsl(var(--primary)/0.4)]"
+            width={112}
+            height={112}
+            className="relative object-contain drop-shadow-[0_0_32px_hsl(var(--primary)/0.45)]"
             priority
           />
         </div>
 
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight gradient-text">SkyLog</h1>
+          <h1 className="text-4xl font-bold tracking-tight gradient-text">SkyLog</h1>
           <p className="text-muted-foreground text-sm leading-relaxed">
             AI-powered log analyzer. Upload a log file, ask a question, and get instant insights.
           </p>
@@ -37,7 +37,7 @@ export default function ChatHomePage() {
           ].map((item) => (
             <div
               key={item.label}
-              className="p-3.5 rounded-xl bg-[hsl(0_0%_100%/0.03)] border border-[hsl(var(--glass-border))] text-left hover-lift"
+              className="p-3.5 rounded-xl bg-[hsl(var(--glass-bg))] border border-[hsl(var(--glass-border))] text-left hover-lift"
             >
               <div className="text-xl mb-1.5">{item.icon}</div>
               <p className="text-xs font-semibold text-foreground">{item.label}</p>

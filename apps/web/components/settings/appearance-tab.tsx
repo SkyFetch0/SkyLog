@@ -71,7 +71,7 @@ export function AppearanceTab() {
                   'group relative text-left p-4 rounded-xl border transition-all',
                   active
                     ? 'border-primary/50 bg-primary/[0.06] shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]'
-                    : 'border-[hsl(var(--glass-border))] bg-[hsl(0_0%_100%/0.02)] hover:border-[hsl(0_0%_100%/0.16)] hover:bg-[hsl(0_0%_100%/0.04)] hover-lift',
+                    : 'border-[hsl(var(--glass-border))] bg-[hsl(var(--glass-bg))] hover:border-[hsl(var(--border-strong))] hover:bg-[hsl(var(--glass-bg))] hover-lift',
                 )}
                 aria-pressed={active}
               >
@@ -80,7 +80,7 @@ export function AppearanceTab() {
                   {p.swatches.map((color, i) => (
                     <div
                       key={i}
-                      className="h-8 flex-1 rounded-md border border-[hsl(0_0%_100%/0.08)]"
+                      className="h-8 flex-1 rounded-md border border-[hsl(var(--glass-border))]"
                       style={{ backgroundColor: color }}
                     />
                   ))}

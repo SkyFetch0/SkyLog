@@ -240,31 +240,78 @@ export class AgentRunner {
         if (finalMessage.stop_reason === 'end_turn') break
         if (finalMessage.stop_reason !== 'tool_use') break
 
-        // ── Execute tool calls ───────────────────────────────────────────────
-        const toolResultContent: Anthropic.ToolResultBlockParam[] = []
+        // ── Execute tool calls (in PARALLEL) ─────────────────────────────────
+        // Why parallel? When the model emits multiple tool_use blocks in a
+        // single assistant turn (e.g. several spawn_agent calls), we want them
+        // to run concurrently — not serially. The global SubAgentSemaphore
+        // (limit=5) still caps real parallelism for sub-agents; other tools
+        // (bash, log_grep…) run with no extra cap which is fine since they are
+        // short-lived sandbox calls.
+        //
+        // Anthropic requires the `tool_result` array we feed back on the next
+        // turn to be in the SAME order as the assistant's tool_use blocks,
+        // and crucially to include EVERY tool_use id. We therefore pre-allocate
+        // a sparse array keyed by block index and write each finished result
+        // into its slot, regardless of completion order. The user-facing SSE
+        // `tool_result` events are emitted as each promise resolves, so the
+        // UI sees real-time parallelism.
+        type ToolExecOutcome = {
+          blockIndex: number
+          toolUseId: string
+          toolName: string
+          input: Record<string, unknown>
+          output: string
+          success: boolean
+          durationMs: number
+        }
+
+        // `resultIndex` is the position within the tool_result array we'll
+        // feed back to Anthropic — strictly 0..(N-1) where N is the number
+        // of tool_use blocks (NOT the index inside assistantContentBlocks,
+        // which also contains text/thinking blocks). Anthropic only cares
+        // that tool_result blocks appear in the same RELATIVE order as the
+        // tool_use blocks, so this collapsed indexing is correct.
+        const toolUseBlocks: Array<{
+          index: number  // 0..(toolUseCount-1)
+          block: Anthropic.ToolUseBlock
+        }> = []
+        for (const block of assistantContentBlocks) {
+          if (block.type === 'tool_use') {
+            toolUseBlocks.push({
+              index: toolUseBlocks.length,
+              block: block as Anthropic.ToolUseBlock,
+            })
+          }
+        }
+
+        const toolResultContent: Anthropic.ToolResultBlockParam[] = new Array(toolUseBlocks.length)
         const dbInserts: Promise<unknown>[] = []
 
-        for (const block of assistantContentBlocks) {
-          if (block.type !== 'tool_use') continue
+        // Emit all tool_use events synchronously up front so the UI sees the
+        // full plan immediately (the user can watch N specialists spawn at once).
+        for (const { block } of toolUseBlocks) {
           if (signal?.aborted) break
+          yield {
+            type: 'tool_use',
+            toolName: block.name,
+            toolUseId: block.id,
+            input: block.input as Record<string, unknown>,
+          }
+        }
 
-          const toolBlock = block as Anthropic.ToolUseBlock
-          const toolInput = toolBlock.input as Record<string, unknown>
-          yield { type: 'tool_use', toolName: toolBlock.name, toolUseId: toolBlock.id, input: toolInput }
-
-          const tool = getToolByName(toolBlock.name)
+        const runOne = async (
+          slot: { index: number; block: Anthropic.ToolUseBlock },
+        ): Promise<ToolExecOutcome> => {
+          const { block, index: blockIndex } = slot
+          const toolInput = block.input as Record<string, unknown>
+          const tool = getToolByName(block.name)
           const startedAt = Date.now()
           let toolOutput: string
           let toolSuccess: boolean
 
           if (!tool) {
-            // Help the model self-correct: list available tools so it picks
-            // a valid one on the next turn. Some models occasionally emit
-            // synthetic names like `function_calls` due to XML wrapper
-            // artifacts in their pretraining — a clear list nudges them
-            // back on track.
             const available = getToolsForAgent(toolRole).map((t) => t.name).join(', ')
-            toolOutput = `Unknown tool: "${toolBlock.name}". Available tools: ${available}.`
+            toolOutput = `Unknown tool: "${block.name}". Available tools: ${available}.`
             toolSuccess = false
           } else {
             const parseResult = tool.inputSchema.safeParse(toolInput)
@@ -284,33 +331,71 @@ export class AgentRunner {
           }
 
           const durationMs = Date.now() - startedAt
+          return {
+            blockIndex,
+            toolUseId: block.id,
+            toolName: block.name,
+            input: toolInput,
+            output: toolOutput,
+            success: toolSuccess,
+            durationMs,
+          }
+        }
 
-          // Buffer DB inserts — flush after loop to reduce round-trips
+        // Fire all tool executions in parallel. We use a Set of "live"
+        // promises and rebuild it as each one settles, so Promise.race
+        // never observes the same resolved promise twice. This is the
+        // canonical pattern for streaming completion-order results in JS.
+        type Tagged = { outcome: ToolExecOutcome; promise: Promise<Tagged> }
+        const live = new Set<Promise<Tagged>>()
+        for (const slot of toolUseBlocks) {
+          // Self-referential tag so we can find this promise in the Set
+          // after it resolves (`winner.promise` === the promise in `live`).
+          const promise: Promise<Tagged> = runOne(slot).then((outcome) => ({
+            outcome,
+            promise,
+          }))
+          live.add(promise)
+        }
+
+        while (live.size > 0) {
+          if (signal?.aborted) break
+
+          const winner = await Promise.race(live)
+          live.delete(winner.promise)
+
+          const { outcome } = winner
+
+          // Yield tool_result event for the UI — this happens AS each tool
+          // finishes, so the user sees real-time parallel completion.
+          yield {
+            type: 'tool_result',
+            toolUseId: outcome.toolUseId,
+            toolName: outcome.toolName,
+            success: outcome.success,
+            output: outcome.output,
+          }
+
+          // Buffer DB insert
           dbInserts.push(
             db.insert(toolCalls).values({
               id: randomUUID(),
               agentRunId,
-              toolName: toolBlock.name,
-              input: toolInput,
-              output: { success: toolSuccess, output: toolOutput },
-              durationMs,
+              toolName: outcome.toolName,
+              input: outcome.input,
+              output: { success: outcome.success, output: outcome.output },
+              durationMs: outcome.durationMs,
             }),
           )
 
-          yield {
+          // Place tool_result block at its ORIGINAL position in the array
+          // — Anthropic requires order-preserved tool_result for the next turn.
+          toolResultContent[outcome.blockIndex] = {
             type: 'tool_result',
-            toolUseId: toolBlock.id,
-            toolName: toolBlock.name,
-            success: toolSuccess,
-            output: toolOutput,
+            tool_use_id: outcome.toolUseId,
+            content: outcome.output,
+            is_error: !outcome.success,
           }
-
-          toolResultContent.push({
-            type: 'tool_result',
-            tool_use_id: toolBlock.id,
-            content: toolOutput,
-            is_error: !toolSuccess,
-          })
         }
 
         // Flush all tool-call DB inserts in parallel

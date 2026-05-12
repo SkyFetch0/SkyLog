@@ -127,7 +127,7 @@ export function ChatArea({ session, onAgentActivity }: Props) {
     <div className="flex flex-col h-full min-h-0 bg-background">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between h-14 px-6 border-b border-border shrink-0 bg-background/80 backdrop-blur-sm">
+      <div className="flex items-center justify-between h-16 px-6 border-b border-border shrink-0 bg-background/80 backdrop-blur-sm">
         <h1 className="font-semibold text-sm text-foreground/90 truncate max-w-[60%]">{session.title}</h1>
         {sending && (
           <div className="flex items-center gap-2 text-xs text-primary animate-pulse">
@@ -168,8 +168,8 @@ export function ChatArea({ session, onAgentActivity }: Props) {
                       onClick={() => { setInput(p.prompt); textareaRef.current?.focus() }}
                       className={cn(
                         'group flex items-start gap-3 p-3.5 rounded-xl text-left transition-all',
-                        'border border-[hsl(var(--glass-border))] bg-[hsl(0_0%_100%/0.02)]',
-                        'hover:border-primary/30 hover:bg-[hsl(0_0%_100%/0.04)] hover-lift',
+                        'border border-[hsl(var(--glass-border))] bg-[hsl(var(--glass-bg))]',
+                        'hover:border-primary/30 hover:bg-[hsl(var(--glass-bg))] hover-lift',
                       )}
                     >
                       <div className={cn(
@@ -200,13 +200,13 @@ export function ChatArea({ session, onAgentActivity }: Props) {
                 ? <StreamingMessage msg={streamingMsg} />
                 : sending && (
                   <div className="flex justify-start mb-5 gap-3 msg-enter">
-                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500/30 to-violet-500/20 border border-blue-400/30 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-[11px] text-blue-300 animate-pulse">✦</span>
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/30 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-[11px] text-primary animate-pulse">✦</span>
                     </div>
-                    <div className="flex items-center gap-2 px-4 py-3 rounded-2xl rounded-tl-sm bg-white/[0.04] border border-white/[0.07]">
+                    <div className="flex items-center gap-2 px-4 py-3 rounded-2xl rounded-tl-sm bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] shadow-[0_2px_12px_-6px_hsl(var(--foreground)/0.10)]">
                       <span className="flex gap-1">
                         {[0,1,2].map(i => (
-                          <span key={i} className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: `${i*150}ms` }} />
+                          <span key={i} className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${i*150}ms` }} />
                         ))}
                       </span>
                       <span className="text-xs text-muted-foreground">Thinking…</span>
@@ -226,7 +226,7 @@ export function ChatArea({ session, onAgentActivity }: Props) {
 
           {/* File upload panel */}
           {showUpload && (
-            <div className="rounded-xl bg-[hsl(0_0%_100%/0.02)] border border-[hsl(var(--glass-border))] p-3">
+            <div className="rounded-xl bg-[hsl(var(--glass-bg))] border border-[hsl(var(--glass-border))] p-3">
               <FileUpload
                 sessionId={session.id}
                 attachedFiles={attachedFiles}
@@ -260,10 +260,10 @@ export function ChatArea({ session, onAgentActivity }: Props) {
           {/* Input box — modern card with soft shadow + glass */}
           <div className={cn(
             'relative rounded-2xl border transition-all duration-200',
-            'shadow-[0_8px_28px_-12px_hsl(0_0%_0%/0.5)]',
+            'bg-[hsl(var(--surface-1))] shadow-[0_8px_28px_-14px_hsl(var(--foreground)/0.18)]',
             sending
-              ? 'bg-[hsl(0_0%_100%/0.02)] border-primary/30'
-              : 'bg-[hsl(0_0%_100%/0.035)] border-[hsl(var(--glass-border))] hover:border-[hsl(0_0%_100%/0.16)] focus-within:border-primary/45 focus-within:bg-[hsl(0_0%_100%/0.05)] focus-within:shadow-[0_0_0_3px_hsl(var(--primary)/0.12),0_8px_28px_-12px_hsl(0_0%_0%/0.5)]',
+              ? 'border-primary/30'
+              : 'border-[hsl(var(--border))] hover:border-[hsl(var(--border-strong))] focus-within:border-primary/45 focus-within:shadow-[0_0_0_3px_hsl(var(--primary)/0.12),0_12px_32px_-12px_hsl(var(--primary)/0.20)]',
           )}>
             <label htmlFor="chat-input" className="sr-only">Message</label>
             <textarea

@@ -67,7 +67,7 @@ export function FileUpload({ sessionId, attachedFiles, onAttach, onDetach }: Pro
         disabled={uploading}
         className={cn(
           'w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed text-sm transition-all',
-          'border-[hsl(var(--glass-border))] text-muted-foreground hover:text-foreground hover:border-[hsl(0_0%_100%/0.2)] hover:bg-[hsl(0_0%_100%/0.02)]',
+          'border-[hsl(var(--glass-border))] text-muted-foreground hover:text-foreground hover:border-[hsl(var(--border-strong))] hover:bg-[hsl(var(--glass-bg))]',
           uploading && 'opacity-50 cursor-not-allowed',
         )}
       >
@@ -79,7 +79,7 @@ export function FileUpload({ sessionId, attachedFiles, onAttach, onDetach }: Pro
                 <span className="text-xs text-muted-foreground">Uploading…</span>
                 <span className="text-xs text-muted-foreground/70">{progress}%</span>
               </div>
-              <div className="h-1 rounded-full bg-[hsl(0_0%_100%/0.06)] overflow-hidden">
+              <div className="h-1 rounded-full bg-[hsl(var(--glass-bg-strong))] overflow-hidden">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-primary to-[hsl(199_89%_55%)] transition-all duration-300"
                   style={{ width: `${progress}%` }}

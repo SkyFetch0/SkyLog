@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
@@ -44,7 +44,7 @@ export function SessionsTab() {
         </div>
       ) : (
         <table className="w-full text-sm">
-          <thead className="bg-[hsl(0_0%_100%/0.02)] border-b border-[hsl(var(--glass-border))]">
+          <thead className="bg-[hsl(var(--glass-bg))] border-b border-[hsl(var(--glass-border))]">
             <tr>
               <th className="text-left px-4 py-2.5 font-semibold text-[10px] uppercase tracking-widest text-muted-foreground">Title</th>
               <th className="text-left px-4 py-2.5 font-semibold text-[10px] uppercase tracking-widest text-muted-foreground">Owner</th>
@@ -55,7 +55,7 @@ export function SessionsTab() {
           </thead>
           <tbody className="divide-y divide-[hsl(var(--glass-border))]">
             {data.sessions.map((s) => (
-              <tr key={s.id} className="hover:bg-[hsl(0_0%_100%/0.02)] transition-colors">
+              <tr key={s.id} className="hover:bg-[hsl(var(--glass-bg))] transition-colors">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2.5">
                     <MessageSquare className="h-3.5 w-3.5 text-muted-foreground shrink-0" />

@@ -55,15 +55,15 @@ const buttonVariants = cva(
           'bg-[hsl(var(--glass-bg-strong))]',
           'border border-[hsl(var(--glass-border))]',
           'backdrop-blur-md',
-          'hover:bg-[hsl(0_0%_100%/0.08)]',
-          'hover:border-[hsl(0_0%_100%/0.14)]',
+          'hover:bg-[hsl(var(--glass-border))]',
+          'hover:border-[hsl(var(--glass-border))]',
         ],
 
         // Ghost — transparent
         ghost: [
           'text-muted-foreground',
           'hover:text-foreground',
-          'hover:bg-[hsl(0_0%_100%/0.05)]',
+          'hover:bg-[hsl(var(--glass-bg-strong))]',
         ],
 
         // Outline — kenarlık only
@@ -71,7 +71,7 @@ const buttonVariants = cva(
           'text-foreground',
           'border border-border-strong',
           'bg-transparent',
-          'hover:bg-[hsl(0_0%_100%/0.04)]',
+          'hover:bg-[hsl(var(--glass-bg))]',
           'hover:border-primary/40',
         ],
 

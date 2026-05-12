@@ -43,7 +43,7 @@ export default function SettingsPage() {
                     'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all',
                     active
                       ? 'bg-primary/10 text-foreground border border-primary/20'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_100%/0.04)] border border-transparent',
+                      : 'text-muted-foreground hover:text-foreground hover:bg-[hsl(var(--glass-bg))] border border-transparent',
                   )}
                 >
                   <Icon className={cn('h-4 w-4 shrink-0', active && 'text-primary')} />

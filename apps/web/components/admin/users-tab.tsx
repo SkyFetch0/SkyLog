@@ -1,4 +1,4 @@
-ï»¿'use client'
+'use client'
 
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -57,12 +57,12 @@ export function UsersTab() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by emailâ€¦"
+          placeholder="Search by email…"
           className={cn(
-            'w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-[hsl(0_0%_100%/0.04)] border text-sm',
+            'w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-[hsl(var(--glass-bg))] border text-sm',
             'text-foreground placeholder:text-muted-foreground/60',
             'focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary/50',
-            'border-[hsl(0_0%_100%/0.08)]',
+            'border-[hsl(var(--glass-border))]',
           )}
         />
       </div>
@@ -79,7 +79,7 @@ export function UsersTab() {
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-[hsl(0_0%_100%/0.02)] border-b border-[hsl(var(--glass-border))]">
+            <thead className="bg-[hsl(var(--glass-bg))] border-b border-[hsl(var(--glass-border))]">
               <tr>
                 <th className="text-left px-4 py-2.5 font-semibold text-[10px] uppercase tracking-widest text-muted-foreground">User</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-[10px] uppercase tracking-widest text-muted-foreground">Role</th>
@@ -130,7 +130,7 @@ function UserRow({
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
-  // Escape ile menÃ¼yÃ¼ kapat
+  // Escape ile menüyü kapat
   useEffect(() => {
     if (!menuOpen) return
     const handler = (e: KeyboardEvent) => {
@@ -141,7 +141,7 @@ function UserRow({
   }, [menuOpen])
 
   return (
-    <tr className="hover:bg-[hsl(0_0%_100%/0.02)] transition-colors">
+    <tr className="hover:bg-[hsl(var(--glass-bg))] transition-colors">
       <td className="px-4 py-3">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-[hsl(var(--surface-2))] border border-[hsl(var(--glass-border))] flex items-center justify-center shrink-0">
@@ -166,7 +166,7 @@ function UserRow({
             'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border',
             user.role === 'admin'
               ? 'text-primary bg-primary/10 border-primary/20'
-              : 'text-muted-foreground bg-[hsl(0_0%_100%/0.04)] border-[hsl(var(--glass-border))]',
+              : 'text-muted-foreground bg-[hsl(var(--glass-bg))] border-[hsl(var(--glass-border))]',
           )}
         >
           {user.role === 'admin' && <ShieldCheck className="h-2.5 w-2.5" />}
@@ -208,7 +208,7 @@ function UserRow({
                       role="menuitem"
                       onClick={() => { setMenuOpen(false); onPromote() }}
                       disabled={promoting}
-                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-xs text-foreground hover:bg-[hsl(0_0%_100%/0.04)] transition-colors disabled:opacity-50 focus-visible:bg-[hsl(0_0%_100%/0.06)]"
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-xs text-foreground hover:bg-[hsl(var(--glass-bg))] transition-colors disabled:opacity-50 focus-visible:bg-[hsl(var(--glass-bg-strong))]"
                     >
                       {user.role === 'admin' ? <ShieldOff className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
                       {user.role === 'admin' ? 'Demote to user' : 'Promote to admin'}
@@ -227,7 +227,7 @@ function UserRow({
               )}
             </>
           ) : (
-            <span className="text-[10px] text-muted-foreground/60">â€”</span>
+            <span className="text-[10px] text-muted-foreground/60">—</span>
           )}
         </div>
       </td>

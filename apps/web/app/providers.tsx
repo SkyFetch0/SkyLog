@@ -30,9 +30,9 @@ export function Providers({ children }: { children: ReactNode }) {
        */}
       <ThemeProvider
         attribute="data-theme"
-        defaultTheme="dark"
+        defaultTheme="light"
         enableSystem={false}
-        themes={['dark', 'light', 'purple', 'ocean']}
+        themes={['light', 'dark', 'purple', 'ocean']}
         storageKey="skylog-theme"
         disableTransitionOnChange
       >

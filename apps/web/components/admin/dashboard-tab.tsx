@@ -1,4 +1,4 @@
-ï»¿'use client'
+'use client'
 
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -16,7 +16,7 @@ function formatTokens(n: number): string {
 }
 
 function formatDuration(start: string | null, end: string | null): string {
-  if (!start) return 'â€”'
+  if (!start) return '—'
   const endTs = end ? new Date(end).getTime() : Date.now()
   const ms = endTs - new Date(start).getTime()
   if (ms < 1000) return `${ms}ms`
@@ -66,7 +66,7 @@ export function DashboardTab() {
 
   return (
     <div className="space-y-6">
-      {/* â”€â”€ Primary stats grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ¦¦ Primary stats grid ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦ */}
       <div>
         <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
           Overview
@@ -79,7 +79,7 @@ export function DashboardTab() {
         </div>
       </div>
 
-      {/* â”€â”€ Activity stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ¦¦ Activity stats ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦ */}
       <div>
         <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
           Activity
@@ -129,7 +129,7 @@ export function DashboardTab() {
         </div>
       </div>
 
-      {/* â”€â”€ Recent agent runs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ¦¦ Recent agent runs ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦ */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -145,7 +145,7 @@ export function DashboardTab() {
                   key={r.id}
                   className={cn(
                     'flex items-center gap-3 px-4 py-2.5 text-xs transition-colors',
-                    'hover:bg-[hsl(0_0%_100%/0.02)]',
+                    'hover:bg-[hsl(var(--glass-bg))]',
                   )}
                 >
                   <StatusIcon status={r.status} />
@@ -155,7 +155,7 @@ export function DashboardTab() {
                   <span className="text-muted-foreground shrink-0 w-44 truncate">{r.userEmail}</span>
                   <span className="text-muted-foreground/70 flex-1 truncate min-w-0">{r.task}</span>
                   <span className="text-muted-foreground/80 tabular-nums shrink-0">
-                    {r.tokensUsed > 0 ? `${formatTokens(r.tokensUsed)} tok` : 'â€”'}
+                    {r.tokensUsed > 0 ? `${formatTokens(r.tokensUsed)} tok` : '—'}
                   </span>
                   <span className="text-muted-foreground/70 tabular-nums shrink-0 w-16 text-right">
                     {formatDuration(r.startedAt, r.completedAt)}

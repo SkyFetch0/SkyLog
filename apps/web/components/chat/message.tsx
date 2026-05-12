@@ -19,12 +19,14 @@ import type { LocalToolCall, LocalSubAgent } from '@/hooks/use-messages'
 export function MarkdownContent({ content }: { content: string }) {
   return (
     <ReactMarkdown
-      className="prose prose-sm prose-invert max-w-none
-        prose-p:leading-relaxed prose-p:my-1.5
-        prose-headings:text-white prose-headings:font-semibold
-        prose-strong:text-white prose-strong:font-semibold
-        prose-li:my-0.5 prose-ul:my-2 prose-ol:my-2
-        prose-code:text-blue-300 prose-code:bg-blue-500/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-[12px] prose-code:font-mono prose-code:border-none
+      className="prose prose-sm max-w-none
+        prose-p:leading-relaxed prose-p:my-1.5 prose-p:text-foreground/90
+        prose-headings:text-foreground prose-headings:font-semibold
+        prose-strong:text-foreground prose-strong:font-semibold
+        prose-li:my-0.5 prose-li:text-foreground/90 prose-ul:my-2 prose-ol:my-2
+        prose-a:text-primary prose-a:no-underline hover:prose-a:underline
+        prose-blockquote:border-l-primary/40 prose-blockquote:text-muted-foreground
+        prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-[12px] prose-code:font-mono prose-code:border-none prose-code:before:content-none prose-code:after:content-none
         prose-pre:p-0 prose-pre:bg-transparent prose-pre:my-2"
       components={{
         code({ className, children, ...props }) {
@@ -288,7 +290,7 @@ export function AssistantMessage({ message }: { message: MsgType }) {
         )}
 
         {/* Final answer */}
-        <div className="group/answer relative rounded-2xl rounded-tl-sm bg-[hsl(0_0%_100%/0.04)] border border-[hsl(var(--glass-border))] px-4 py-3.5 text-sm text-foreground/90 shadow-[0_2px_12px_-6px_hsl(0_0%_0%/0.4)]">
+        <div className="group/answer relative rounded-2xl rounded-tl-sm bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] px-4 py-3.5 text-sm text-foreground/90 shadow-[0_2px_12px_-6px_hsl(var(--foreground)/0.12)]">
           <MarkdownContent content={message.content} />
           <CopyButton text={message.content} />
         </div>
@@ -324,7 +326,7 @@ function CopyButton({ text }: { text: string }) {
         'opacity-0 group-hover/answer:opacity-100 focus-visible:opacity-100',
         copied
           ? 'text-success bg-success/10 border border-success/20'
-          : 'text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_100%/0.06)] border border-transparent',
+          : 'text-muted-foreground hover:text-foreground hover:bg-[hsl(var(--glass-bg-strong))] border border-transparent',
       )}
       aria-label={copied ? 'Copied' : 'Copy message'}
       title={copied ? 'Copied!' : 'Copy message'}

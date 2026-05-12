@@ -68,18 +68,18 @@ export function Sidebar() {
         </button>
 
         {/* Logo */}
-        <div className={cn('flex items-center h-14 border-b border-sidebar-border', collapsed ? 'justify-center px-3' : 'px-4')}>
-          <Link href="/chat" className="flex items-center gap-2.5 shrink-0">
+        <div className={cn('flex items-center h-16 border-b border-sidebar-border', collapsed ? 'justify-center px-2' : 'px-4')}>
+          <Link href="/chat" className="flex items-center gap-2.5 shrink-0 group">
             <Image
               src="/images/SkyLogo.png"
               alt="SkyLog"
-              width={28}
-              height={28}
-              className="rounded-lg object-contain shrink-0"
+              width={collapsed ? 36 : 40}
+              height={collapsed ? 36 : 40}
+              className="object-contain shrink-0 drop-shadow-[0_0_12px_hsl(var(--primary)/0.35)] transition-transform duration-200 group-hover:scale-105"
               priority
             />
             {!collapsed && (
-              <span className="font-bold text-sm text-foreground tracking-tight truncate">SkyLog</span>
+              <span className="font-bold text-base gradient-text tracking-tight truncate">SkyLog</span>
             )}
           </Link>
         </div>
@@ -154,7 +154,7 @@ export function Sidebar() {
                     'flex items-center gap-2.5 w-full rounded-xl text-xs transition-all px-2 py-2',
                     pathname.startsWith('/admin')
                       ? 'text-foreground bg-primary/10'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_100%/0.04)]',
+                      : 'text-muted-foreground hover:text-foreground hover:bg-[hsl(var(--glass-bg))]',
                     collapsed && 'justify-center px-0',
                   )}
                 >
@@ -183,7 +183,7 @@ export function Sidebar() {
                   'flex items-center gap-2.5 w-full rounded-xl text-xs transition-all px-2 py-2',
                   pathname === '/settings'
                     ? 'text-foreground bg-primary/10'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_100%/0.04)]',
+                    : 'text-muted-foreground hover:text-foreground hover:bg-[hsl(var(--glass-bg))]',
                   collapsed && 'justify-center px-0',
                 )}
               >
@@ -252,7 +252,7 @@ function SessionItem({
             'group flex items-center gap-2 rounded-xl px-2 py-2 cursor-pointer transition-all duration-150',
             active
               ? 'bg-primary/12 text-foreground'
-              : 'text-muted-foreground hover:bg-[hsl(0_0%_100%/0.04)] hover:text-foreground',
+              : 'text-muted-foreground hover:bg-[hsl(var(--glass-bg))] hover:text-foreground',
             collapsed && 'justify-center px-0 w-9 h-9 mx-auto',
           )}
           onMouseEnter={() => setHovered(true)}
