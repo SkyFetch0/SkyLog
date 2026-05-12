@@ -38,12 +38,19 @@ export const writeFileTool: AgentTool<Input> = {
       resolved.startsWith(agentOutputDir + '/') || resolved === agentOutputDir
 
     if (!allowed) {
+      // Models sometimes invent agent IDs that look plausible (e.g. copied
+      // from a few-shot example or hallucinated). Tell them exactly which
+      // path to use — and remind them to keep just the filename.
+      const filename = path.basename(resolved) || 'report.json'
+      const suggestion = path.join(agentOutputDir, filename)
       return {
         success: false,
         output: '',
         error:
-          `Write denied. Path '${resolved}' is outside the agent output directory ` +
-          `(${agentOutputDir}). Agents may only write to their own output/ folder.`,
+          `Write denied. Path '${resolved}' is outside YOUR output directory.\n` +
+          `Your output directory for this run is:\n  ${agentOutputDir}\n` +
+          `Use this exact prefix and only your own agent ID. ` +
+          `Suggested path: ${suggestion}`,
       }
     }
 

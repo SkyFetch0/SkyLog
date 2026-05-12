@@ -74,6 +74,13 @@ export interface SubAgentResult {
 export class AgentRunner {
   private readonly anthropic: Anthropic
   private readonly model: string
+  // True only when we are talking to api.anthropic.com directly. Custom
+  // OpenAI-compatible / proxy endpoints (CUSTOM_API_BASE_URL set) usually
+  // do not implement Anthropic-specific features like `thinking` blocks or
+  // the full content-block streaming protocol. When this flag is false we
+  // fall back to a feature-minimal mode that works against any
+  // Anthropic-compatible API.
+  private readonly isNativeAnthropic: boolean
 
   constructor() {
     // Custom API takes precedence over Anthropic direct
@@ -85,6 +92,7 @@ export class AgentRunner {
     if (!apiKey) throw new Error('ANTHROPIC_API_KEY (or CUSTOM_API_KEY) environment variable is not set')
 
     this.model = customModel || 'claude-sonnet-4-5-20250929'
+    this.isNativeAnthropic = !customBase
 
     this.anthropic = new Anthropic({
       apiKey,
@@ -108,9 +116,34 @@ export class AgentRunner {
     } = options
 
     const isOrchestrator = role === 'orchestrator'
-    const systemPrompt = isOrchestrator
+    const basePrompt = isOrchestrator
       ? getOrchestratorPrompt()
       : getSpecialistPrompt(role)
+
+    // ── Runtime context injection ────────────────────────────────────────
+    // Models sometimes hallucinate their own agent ID or output path
+    // (e.g. copy IDs from few-shot examples), causing write_file calls to
+    // hit the wrong directory and fail. We append an explicit "runtime
+    // facts" block to the system prompt with the EXACT paths this agent
+    // is allowed to use, so there's no ambiguity to make up.
+    const workdir = sandbox.agentWorkdir(sessionId, agentRunId)
+    const outputDir = `${workdir}/output`
+    const runtimeContext = isOrchestrator
+      ? `\n\n## Runtime context (this turn)\n` +
+        `- Session ID: ${sessionId}\n` +
+        `- Your agent ID: ${agentRunId}\n` +
+        `- Your workdir: ${workdir}\n`
+      : `\n\n## Runtime context (this run — use these EXACT values)\n` +
+        `- Session ID: ${sessionId}\n` +
+        `- Your agent ID: ${agentRunId}\n` +
+        `- Your workdir: ${workdir}\n` +
+        `- Your output directory (ONLY place you can write_file to): ${outputDir}\n` +
+        `- Suggested output filename: ${outputDir}/${role.replace(/_/g, '-')}-report.json\n` +
+        `\nNEVER invent a different agent ID. Always use the one above when ` +
+        `composing output paths. The few-shot example in the prompt is illustrative — ` +
+        `your real path uses the IDs in this section.`
+
+    const systemPrompt = basePrompt + runtimeContext
 
     const toolRole: 'orchestrator' | 'subagent' = isOrchestrator ? 'orchestrator' : 'subagent'
     const agentTools = getToolsForAgent(toolRole)
@@ -163,10 +196,13 @@ export class AgentRunner {
           messages,
         }
 
-        // Extended thinking — supported by claude-sonnet-4-x and compatible APIs.
-        // If the API does not support it the stream will simply not emit
-        // thinking_delta events and we fall back to text-only streaming.
-        streamParams.thinking = { type: 'enabled', budget_tokens: 8000 }
+        // Extended thinking is an Anthropic-only feature. Sending it to a
+        // custom proxy/OpenAI-compatible endpoint can cause the upstream to
+        // silently return an empty message (no content_block events, 0
+        // tokens). We therefore enable it ONLY against api.anthropic.com.
+        if (this.isNativeAnthropic) {
+          streamParams.thinking = { type: 'enabled', budget_tokens: 8000 }
+        }
 
         const stream = this.anthropic.messages.stream(streamParams)
 
@@ -199,6 +235,10 @@ export class AgentRunner {
                     name: currentToolName,
                     input: {},
                   })
+                } else {
+                  // Unknown block type — fall through; the finalMessage()
+                  // fallback below will rebuild the content array.
+                  currentBlockType = ''
                 }
                 break
 
@@ -238,14 +278,75 @@ export class AgentRunner {
             }
           }
         } catch (streamErr) {
-          // Ensure Anthropic stream is cleaned up on error
-          stream.abort?.()
-          throw streamErr
+          // Some custom Anthropic-compatible proxies (notably app.claude.gg
+          // with model cortex-4-6-t) occasionally send event types in the
+          // wrong order — e.g. `content_block_start` before `message_start`.
+          // The SDK throws `AnthropicError: Unexpected event order, got ...`
+          // in that case. The full message is usually still recoverable via
+          // `stream.finalMessage()` — so we catch THIS specific protocol
+          // error, log a warning, and fall through. The `finalMessage()`
+          // fallback below (which rebuilds assistantContentBlocks from the
+          // final content array) will salvage the response.
+          const msg = streamErr instanceof Error ? streamErr.message : String(streamErr)
+          const isProtocolGlitch = /Unexpected event order/i.test(msg)
+          if (!isProtocolGlitch) {
+            // Real error — clean up and bubble up as before.
+            stream.abort?.()
+            throw streamErr
+          }
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[runner.stream] custom-API protocol glitch (recovered via finalMessage): ${msg}`,
+          )
+          // Fall through: finalMessage() below still works because the
+          // SDK exposes the partially-accumulated snapshot.
         }
 
-        const finalMessage = await stream.finalMessage()
+        let finalMessage: Anthropic.Message
+        try {
+          finalMessage = await stream.finalMessage()
+        } catch (finalErr) {
+          // If we cannot even pull the final message (the upstream truly
+          // died mid-stream), rethrow so the outer catch records the run
+          // as failed.
+          stream.abort?.()
+          throw finalErr
+        }
         totalInputTokens += finalMessage.usage.input_tokens
         totalOutputTokens += finalMessage.usage.output_tokens
+
+        // ── Fallback for non-Anthropic streams ─────────────────────────────
+        // Some custom proxies (e.g. OpenAI-compatible gateways set via
+        // CUSTOM_API_BASE_URL) only emit message_start/delta/stop events
+        // and skip the content_block_* event series entirely. In that case
+        // our streaming switch above sees nothing and `assistantContentBlocks`
+        // ends up empty — yet `finalMessage.content` still contains the
+        // full assistant message. We reconstruct from it so the rest of the
+        // agent loop works the same way it would against native Anthropic.
+        //
+        // For native Anthropic streams this branch is a no-op because we
+        // already populated assistantContentBlocks incrementally above.
+        if (assistantContentBlocks.length === 0 && Array.isArray(finalMessage.content)) {
+          for (const block of finalMessage.content) {
+            if (block.type === 'text') {
+              const textBlock = block as Anthropic.TextBlock
+              assistantContentBlocks.push({ type: 'text', text: textBlock.text } as Anthropic.TextBlock)
+              if (textBlock.text) {
+                finalText += textBlock.text
+                yield { type: 'text_delta', delta: textBlock.text }
+              }
+            } else if (block.type === 'tool_use') {
+              const tu = block as Anthropic.ToolUseBlock
+              assistantContentBlocks.push({
+                type: 'tool_use',
+                id: tu.id,
+                name: tu.name,
+                input: tu.input as Record<string, unknown>,
+              })
+            }
+            // thinking blocks: skip — we don't replay them to the API.
+          }
+        }
 
         messages.push({ role: 'assistant', content: assistantContentBlocks })
 

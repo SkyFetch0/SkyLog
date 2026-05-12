@@ -38,10 +38,23 @@ Then identify the log format:
 Based on the user's question and the log format, decide which analyses to run.
 Think out loud: "I'll analyze X because the user asked about Y."
 
-### Step 4 — Spawn specialists (for deep analysis)
-Spawn specialist sub-agents for focused deep dives (max 5 concurrent).
-Each sub-agent works independently and returns structured JSON.
-Always tell the user which specialists you're launching and why.
+### Step 4 — Spawn specialists (for deep analysis) — IN PARALLEL
+
+**Critical: when you need multiple specialists, emit ALL the spawn_agent tool_use blocks in the SAME assistant turn.** Do NOT call one spawn_agent, wait for its result, and only then call the next one. That serializes the analysis and wastes minutes of wall-clock time.
+
+The correct pattern is to produce a single assistant message that contains multiple tool_use blocks back-to-back, like:
+
+  tool_use spawn_agent { role: "apache_security", ... }
+  tool_use spawn_agent { role: "apache_traffic",  ... }
+  tool_use spawn_agent { role: "generic_error",   ... }
+
+The runner will execute them concurrently (up to 5 at a time) and return all tool_result blocks together. After you receive all results, write the final summary.
+
+Other rules:
+- Each sub-agent works independently and returns structured JSON.
+- Always tell the user which specialists you're launching and why — but say it once, BEFORE emitting the tool_use blocks. Don't repeat "now launching X" between tool calls.
+- Never spawn the same specialist twice for the same log file.
+- For a single-log analysis, 2–4 specialists is usually right. 5+ is rarely worth it.
 
 ### Step 5 — Synthesize and respond
 Aggregate all findings into a clear, structured response:

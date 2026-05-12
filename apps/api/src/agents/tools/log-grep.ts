@@ -19,10 +19,15 @@ const inputSchema = z.object({
     .number()
     .int()
     .min(1)
-    .max(1000)
+    .max(10_000)
     .optional()
     .default(100)
-    .describe('Maximum number of matches to return (default: 100)'),
+    .describe(
+      'Maximum number of matches to return (default: 100, max: 10000). ' +
+      'Higher values let you count occurrences accurately across very large logs, ' +
+      'but the response payload grows proportionally — use 1000+ only when you ' +
+      'genuinely need full enumeration (e.g. counting hits of a specific IP).',
+    ),
 })
 
 type Input = z.infer<typeof inputSchema>
